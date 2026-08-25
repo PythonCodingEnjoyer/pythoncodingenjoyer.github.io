@@ -449,7 +449,10 @@ i,em{font-style:normal}
     dragged = cap.parentElement;
     dragged.classList.add("dragging");
     e.dataTransfer.effectAllowed = "move";
-    try { e.dataTransfer.setData("text/plain", dragged.dataset.box); } catch (err) {}
+    // Никакого text/plain: при отпускании над редактируемым полем
+    // браузер вставил бы этот текст прямо в список.
+    try { e.dataTransfer.setData("application/x-alvarej-box", dragged.dataset.box); }
+    catch (err) {}
   });
 
   function clearMarks() {
@@ -457,6 +460,16 @@ i,em{font-style:normal}
       el.classList.remove("drop-before", "drop-after");
     });
   }
+
+
+  // Пока тянем блок, глушим стандартную обработку: иначе отпускание мимо цели
+  // вставляет данные перетаскивания в текст.
+  document.addEventListener("dragover", function (e) {
+    if (dragged) e.preventDefault();
+  }, true);
+  document.addEventListener("drop", function (e) {
+    if (dragged) e.preventDefault();
+  }, true);
 
   document.addEventListener("dragend", function () {
     if (dragged) dragged.classList.remove("dragging");
