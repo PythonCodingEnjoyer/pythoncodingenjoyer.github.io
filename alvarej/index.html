@@ -210,7 +210,12 @@ i,em{font-style:normal}
   }
 
   // ---------------------------------------------------------------- зоны
-  var zones = list(".sheet, .sheet .col");
+  // Первые две страницы — сам лист и заклинания — структурно неприкосновенны:
+  // блоки там нельзя ни двигать, ни переименовывать, ни удалять.
+  list(".sheet").forEach(function (sh, i) { if (i < 2) sh.dataset.lock = "1"; });
+  function locked(el) { return !!(el && el.closest && el.closest("[data-lock]")); }
+
+  var zones = list(".sheet, .sheet .col").filter(function (z) { return !locked(z); });
   zones.forEach(function (z, i) { z.dataset.zone = "z" + i; });
   function zoneOf(el) { return el.closest("[data-zone]"); }
 
@@ -224,6 +229,11 @@ i,em{font-style:normal}
         var id = slug(cap.textContent);
         seen[id] = (seen[id] || 0) + 1;
         b.dataset.box = seen[id] > 1 ? id + "-" + seen[id] : id;
+      }
+      if (locked(b)) {
+        cap.removeAttribute("draggable");
+        cap.classList.remove("grab");
+        return;
       }
       cap.setAttribute("draggable", "true");
       cap.classList.add("grab");
@@ -390,7 +400,7 @@ i,em{font-style:normal}
   document.addEventListener("dragover", function (e) {
     if (!dragged) return;
     var over = e.target.closest && e.target.closest(".box");
-    if (!over || over === dragged || !over.dataset.box) return;
+    if (!over || over === dragged || !over.dataset.box || locked(over)) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     var r = over.getBoundingClientRect();
@@ -404,7 +414,7 @@ i,em{font-style:normal}
   document.addEventListener("drop", function (e) {
     if (!dragged) return;
     var over = e.target.closest && e.target.closest(".box");
-    if (!over || over === dragged || !over.dataset.box) return;
+    if (!over || over === dragged || !over.dataset.box || locked(over)) return;
     e.preventDefault();
     var before = over.classList.contains("drop-before");
     over.parentElement.insertBefore(dragged, before ? over : over.nextSibling);
@@ -445,7 +455,7 @@ i,em{font-style:normal}
 
   document.addEventListener("contextmenu", function (e) {
     var box = e.target.closest && e.target.closest(".box[data-box]");
-    if (!box) { closeMenu(); return; }
+    if (!box || locked(box)) { closeMenu(); return; }
     e.preventDefault();
     openMenu(e.clientX, e.clientY, box);
   });
