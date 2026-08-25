@@ -391,6 +391,29 @@ i,em{font-style:normal}
     document.execCommand("insertText", false, t);
   });
 
+
+  // ------------------------------------------------------------- горячие клавиши
+  // Ctrl+B — жирный и обратно. Ловим по e.code, а не по букве: на русской
+  // раскладке та же клавиша даёт «и», и проверка по символу не сработала бы.
+  try { document.execCommand("styleWithCSS", false, false); } catch (e) {}
+
+  document.addEventListener("keydown", function (e) {
+    if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+    var el = document.activeElement;
+    if (!el || !el.isContentEditable) return;
+
+    if (e.code === "KeyB") {
+      e.preventDefault();
+      document.execCommand("bold");
+      saveFields();
+      return;
+    }
+    // курсив он не любит — глушим, чтобы не появился случайно
+    if (e.code === "KeyI" || e.code === "KeyU") {
+      e.preventDefault();
+    }
+  });
+
   // ------------------------------------------------------ перетаскивание
   var dragged = null;
 
