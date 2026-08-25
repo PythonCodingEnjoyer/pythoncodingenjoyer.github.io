@@ -97,16 +97,20 @@ body{background:var(--room);font-family:"PT Sans Narrow","Arial Narrow",Arial,sa
             display:flex;align-items:center;justify-content:center;font-size:2.05cqw;line-height:1}
 .ab-top .lab{font-size:1.05cqw;color:var(--dim);text-align:center;margin-top:.15cqw}
 .ab-rows{flex:0 0 auto;display:flex;flex-direction:column;gap:.95cqw;padding-top:.35cqw}
-.sk{display:grid;grid-template-columns:auto 3.4cqw 1fr auto;
-    align-items:center;gap:.5cqw;min-width:0}
-.sk .pv{font-size:1.05cqw;color:var(--dim);font-variant-numeric:tabular-nums;
-        min-width:2cqw;text-align:right}
-.sk[data-kind="save"]{grid-template-columns:auto 3.4cqw 1fr}
+.sk{display:flex;align-items:center;gap:.45cqw;min-width:0}
+/* сеткой раскладываем ТОЛЬКО строки характеристик: у прочих .sk другой набор детей */
+.ab-rows .sk{display:grid;grid-template-columns:auto 3.2cqw 1fr auto;
+             align-items:center;gap:.4cqw}
+.ab-rows .sk[data-kind="save"]{grid-template-columns:auto 3.4cqw 1fr}
+.ab-rows .sk .n{flex:none}
+.sk .pv{font-size:1cqw;color:var(--dim);font-variant-numeric:tabular-nums;
+        min-width:1.7cqw;text-align:right}
 .pm{flex:0 0 auto;width:1.45cqw;height:1.45cqw;border:.1cqw solid var(--line);border-radius:50%}
 .pm.p1{background:var(--ink)}
 .pm.p2{background:var(--ink);box-shadow:0 0 0 .26cqw var(--paper),0 0 0 .46cqw var(--ink)}
-.sk .n{text-align:right;font-size:1.6cqw;font-weight:700;line-height:1}
+.sk .n{flex:0 0 3.4cqw;text-align:right;font-size:1.6cqw;font-weight:700;line-height:1}
 .sk .t{font-size:1.42cqw;color:var(--ink);line-height:1.15}
+.ab-rows .sk .t{font-size:1.34cqw}
 
 /* ---------- простые табло ---------- */
 .tile{align-items:center;justify-content:center;gap:.2cqw;padding:.5cqw}
