@@ -157,6 +157,8 @@ td.c{text-align:center}
 #boxmenu button{font:inherit;font-size:.92rem;text-align:left;padding:.5rem .7rem;
          border:0;background:none;border-radius:.35rem;cursor:pointer;color:#17161A}
 #boxmenu button:hover{background:#EAF1FB;color:#1D3F73}
+/* атрибут hidden обязан побеждать display:flex, иначе меню не скрыть */
+#boxmenu[hidden]{display:none}
 .box.custom{border-style:dashed}
 
 /* ---------- страница настроек ---------- */
@@ -545,6 +547,11 @@ i,em{font-style:normal}
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") closeMenu();
   });
+  addEventListener("scroll", closeMenu, true);
+  addEventListener("resize", closeMenu);
+  document.addEventListener("pointerdown", function (e) {
+    if (!e.target.closest("#boxmenu")) closeMenu();
+  }, true);
 
   function addAfter(box) {
     var title = prompt("Название нового блока", "Новый блок");
