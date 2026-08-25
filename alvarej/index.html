@@ -143,6 +143,9 @@ td.c{text-align:center}
 [contenteditable]{outline:none}
 [contenteditable]:focus{background:#EDF2FA;border-radius:.3cqw}
 .hand,.ed{color:var(--hand);font-weight:700}
+/* .ed должен побеждать любые точечные правила цвета */
+.sk .t.ed,.ln .val .ed,.vit .ed,td.ed,.prose.ed,.coin .v.ed,
+.res .it .t.ed,.box .body .ed{color:var(--hand)}
 .prose.ed{font-weight:400}
 .prose.ed b{font-weight:700;color:var(--hand)}
 .ed:focus{background:#EAF1FB;border-radius:.3cqw}
