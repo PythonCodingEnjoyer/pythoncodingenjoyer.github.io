@@ -188,9 +188,9 @@ i,em{font-style:normal}
   "use strict";
 
   var K_FIELDS = "alvarej-sheet-v1";
-  var K_ORDER = "alvarej-order-v1";
-  var K_CUSTOM = "alvarej-custom-v1";
-  var K_DEL = "alvarej-deleted-v1";
+  var K_ORDER = "alvarej-order-v2";
+  var K_CUSTOM = "alvarej-custom-v2";
+  var K_DEL = "alvarej-deleted-v2";
 
   function load(key, fallback) {
     try {
@@ -215,8 +215,19 @@ i,em{font-style:normal}
   list(".sheet").forEach(function (sh, i) { if (i < 2) sh.dataset.lock = "1"; });
   function locked(el) { return !!(el && el.closest && el.closest("[data-lock]")); }
 
-  var zones = list(".sheet, .sheet .col").filter(function (z) { return !locked(z); });
-  zones.forEach(function (z, i) { z.dataset.zone = "z" + i; });
+  // Идентификатор зоны привязан к её МЕСТУ в разметке (лист + номер колонки),
+  // а не к сквозному счётчику: иначе любое изменение набора зон сдвигает все
+  // номера, и сохранённый порядок раскидывает блоки по чужим местам.
+  var zones = [];
+  list(".sheet").forEach(function (sh, si) {
+    sh.dataset.zone = "s" + si;
+    zones.push(sh);
+    list(".col", sh).forEach(function (c, ci) {
+      c.dataset.zone = "s" + si + "c" + ci;
+      zones.push(c);
+    });
+  });
+  zones = zones.filter(function (z) { return !locked(z); });
   function zoneOf(el) { return el.closest("[data-zone]"); }
 
   // ------------------------------------------------------------- ярлыки
@@ -295,7 +306,7 @@ i,em{font-style:normal}
   var custom = load(K_CUSTOM, {});
   Object.keys(custom).forEach(function (zid) {
     var zone = document.querySelector('[data-zone="' + zid + '"]');
-    if (!zone) return;
+    if (!zone || locked(zone)) return;
     custom[zid].forEach(function (c) {
       if (document.querySelector('[data-box="' + c.id + '"]')) return;
       zone.appendChild(makeBox(c.id, c.title, c.body));
@@ -312,7 +323,7 @@ i,em{font-style:normal}
   var order = load(K_ORDER, {});
   Object.keys(order).forEach(function (zid) {
     var zone = document.querySelector('[data-zone="' + zid + '"]');
-    if (!zone) return;
+    if (!zone || locked(zone)) return;
     order[zid].forEach(function (bid) {
       var b = document.querySelector('[data-box="' + bid + '"]');
       if (b) zone.appendChild(b);
@@ -356,6 +367,7 @@ i,em{font-style:normal}
   function saveOrder() {
     var data = {};
     list("[data-zone]").forEach(function (z) {
+      if (locked(z)) return;
       var kids = [].slice.call(z.children)
         .filter(function (c) { return c.dataset && c.dataset.box; })
         .map(function (c) { return c.dataset.box; });
@@ -500,6 +512,10 @@ i,em{font-style:normal}
   }
 
   // ------------------------------------------------------------- кнопки
+  ["alvarej-order-v1", "alvarej-custom-v1", "alvarej-deleted-v1"].forEach(function (k) {
+    try { localStorage.removeItem(k); } catch (e) {}
+  });
+
   var r1 = document.getElementById("reset-sheet");
   if (r1) r1.addEventListener("click", function () {
     if (!confirm("Стереть все ваши правки и вернуть исходный текст?")) return;
