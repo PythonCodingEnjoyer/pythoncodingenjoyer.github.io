@@ -1,0 +1,24 @@
+{
+  "name": "Альварей — лист персонажа",
+  "short_name": "Альварей",
+  "start_url": "./",
+  "scope": "./",
+  "display": "minimal-ui",
+  "background_color": "#FAF8F4",
+  "theme_color": "#1D3F73",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
