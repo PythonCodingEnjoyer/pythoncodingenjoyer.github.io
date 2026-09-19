@@ -1780,9 +1780,16 @@ i,em{font-style:normal}
       on.checked = e.target.checked;
       changed();
     });
-    // a name or a duration retyped in the table changes what the list offers - and a
-    // row that stopped saying concentration must let go of its tick
-    table.addEventListener("input", function () { fill(); mirror(); });
+    // A name or a duration retyped in the table changes what the list offers - and a row
+    // that stopped saying concentration must let go of its tick.
+    // ONLY for text cells: a click on a checkbox fires «input» too, BEFORE «change», and
+    // rebuilding here unticked the box the click had just ticked - so the tick never
+    // reached the «change» handler and the top box never saw it.
+    table.addEventListener("input", function (e) {
+      if (e.target.tagName === "INPUT") return;
+      fill();
+      mirror();
+    });
   })();
 
   // ============================================================ кубы
