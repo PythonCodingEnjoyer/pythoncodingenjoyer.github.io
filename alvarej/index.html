@@ -161,11 +161,13 @@ td.dim{color:var(--dim);font-weight:400}
 
 /* Карточка заклинания — таблица ИЗ ЕГО ДОКУМЕНТА, ячейка в ячейку. Шрифт — обычный PT
    Sans, а не узкий: в документе он обычный, и узкий рядом с ним читается как другая вещь.
-   ВСЕ размеры в em, а сам кегль ставит скрипт от ШИРИНЫ ЛИСТА при каждом показе. Было в
-   rem, то есть намертво: лист в узком окне ужимается, а карточка оставалась прежней и
-   накрывала полэкрана крупным шрифтом («why is this so big wtf»). cqw тут не годится:
-   карточка висит поверх страницы и ни в одном контейнере не лежит. */
-.spellcard{position:fixed;z-index:60;width:40em;max-width:calc(100vw - 24px);
+   Кегль и ширину ставит скрипт при каждом показе, и берёт их НЕ по формуле, а у самой
+   таблицы заклинаний: кегль — ровно как у её синих строк, ширина — почти во всю таблицу.
+   Формула от ширины листа промахивалась при другом масштабе браузера: у него текст
+   карточки выходил вдвое крупнее таблицы, а сама карточка — узкой и высокой. Все
+   внутренние размеры в em, чтобы шли за кеглем. cqw тут не годится: карточка висит
+   поверх страницы и ни в одном контейнере не лежит. */
+.spellcard{position:fixed;z-index:60;max-width:calc(100vw - 24px);
            max-height:80vh;overflow:auto;
            background:var(--paper);color:var(--ink);border:2px solid var(--line);
            border-radius:.35em;padding:.5em;box-shadow:0 .5em 1.6em rgba(0,0,0,.28);
@@ -1653,24 +1655,32 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       return true;
     }
 
-    // Кегль карточки — от ширины листа, как у всего остального на странице: лист в узком
-    // окне ужимается, и карточка обязана ужиматься вместе с ним. 1,25 % ширины листа —
-    // это ровно кегль строк таблицы заклинаний под ней (1,28cqw); границы — чтобы на
-    // телефоне текст не стал нечитаемым, а на огромном мониторе — плакатным.
+    // Кегль и ширина карточки берутся У САМОЙ ТАБЛИЦЫ, а не по формуле. Он попросил
+    // прямо: «текст размером должен быть такой же, как у заклинаний синим». Формула от
+    // ширины листа попадала только при моём масштабе браузера, а при его — давала текст
+    // вдвое крупнее таблицы и карточку узкую и высокую. Так что: кегль — ровно как у
+    // ячейки таблицы, ширина — почти во всю таблицу. Тогда строки его документа
+    // становятся длинными и короткими, а не столбиком.
     function scale() {
-      var sheet = document.querySelector('.sheet[data-page="spells"]') ||
-                  document.querySelector(".sheet");
-      var w = sheet ? sheet.getBoundingClientRect().width : 1180;
-      card.style.fontSize = Math.max(11, Math.min(15, w * 0.0125)).toFixed(2) + "px";
+      var table = document.getElementById("spelltable");
+      var td = table && table.querySelector("td.ed");
+      card.style.fontSize = (td ? parseFloat(getComputedStyle(td).fontSize) : 14) + "px";
+      var tw = table ? table.getBoundingClientRect().width : 900;
+      card.style.width = Math.round(Math.min(tw * 0.92, innerWidth - 24)) + "px";
     }
 
+    // Широкую карточку не за курсором водить, а ставить ровно над таблицей: по
+    // горизонтали по центру таблицы, по вертикали — сразу под строкой, на которую
+    // наведён указатель, чтобы сама строка оставалась видна.
     function place(x, y) {
       scale();
       card.hidden = false;
       var r = card.getBoundingClientRect();
-      var left = Math.min(x + 16, innerWidth - r.width - 12);
+      var t = table.getBoundingClientRect();
+      var left = t.left + (t.width - r.width) / 2;
+      left = Math.max(12, Math.min(left, innerWidth - r.width - 12));
       var top = Math.min(y + 14, innerHeight - r.height - 12);
-      card.style.left = Math.max(12, left) + "px";
+      card.style.left = left + "px";
       card.style.top = Math.max(12, top) + "px";
     }
 
