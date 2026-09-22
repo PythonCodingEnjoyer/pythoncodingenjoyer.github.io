@@ -13,11 +13,11 @@
 <style>
 :root{
   --ink:#17161A; --line:#17161A; --hair:#B7B5B0; --paper:#fff; --panel:#FCFCFD;
-  --room:#C9C7C2; --dim:#6A6870; --hand:#1D3F73; --warn:#8A4A22; --tint:#EAF1FB;
+  --room:#C9C7C2; --dim:#6A6870; --hand:#1D3F73; --warn:#8A4A22; --tint:#EAF1FB; --zebra:#EFEFEF;
 }
 html[data-theme="dark"]{
   --ink:#E7E9ED; --line:#5B626E; --hair:#333941; --paper:#161A20; --panel:#1B2027;
-  --room:#0B0D10; --dim:#98A0AD; --hand:#8FB6E8; --warn:#D79A6A; --tint:#1E2836;
+  --room:#0B0D10; --dim:#98A0AD; --hand:#8FB6E8; --warn:#D79A6A; --tint:#1E2836; --zebra:#1F242B;
 }
 html[data-theme="dark"] .btns button:hover,
 html[data-theme="dark"] .btns button:focus-visible,
@@ -157,6 +157,10 @@ td.dim{color:var(--dim);font-weight:400}
 .sheet .box .body td.conc{color:var(--warn);font-weight:700}
 #spelltable td{font-size:1.28cqw;padding:.42cqw .4cqw}
 #spelltable th{font-size:1.2cqw;padding:.25cqw .4cqw}
+/* Zebra stripes, as in Excel (his request 2026-09-22): every other spell row gets a light
+   grey ground so the eye keeps its row across nine columns. Row 1 is the header, so the
+   first spell row is child 2 and is striped. */
+#spelltable tr:nth-child(even){background:var(--zebra)}
 #spelltable tr.peek{background:var(--tint)}
 
 /* Карточка заклинания — таблица ИЗ ЕГО ДОКУМЕНТА, ячейка в ячейку. Шрифт — обычный PT
