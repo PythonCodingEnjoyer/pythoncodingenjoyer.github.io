@@ -2058,6 +2058,31 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     });
   })();
 
+  // =========================================== one bracelet, two verses
+  // The Silver Verse bracelet has ONE charge for both verses (his word 2026-09-25: «если на
+  // 1 нажал то второй автоматически тоже зачёркивается т.к. он всего 1»). The two rows stay -
+  // they are two different effects - but their pips are one fact: ticking either ticks both,
+  // unticking either gives both back. The rests clear both by the «res» prefix already.
+  (function bracelet() {
+    var pair = [cell("res-white-0"), cell("res-black-0")];
+    if (!pair[0] || !pair[1]) return;
+    function both(on) {
+      pair.forEach(function (p) { p.checked = on; touch(p); });
+    }
+    // A state saved while the verses were separate may have one spent and one not - and
+    // then the bracelet IS spent.
+    if (pair[0].checked !== pair[1].checked) {
+      both(true);
+      saveFields({ target: pair[0] });
+    }
+    pair.forEach(function (p) {
+      p.addEventListener("change", function () {
+        both(p.checked);
+        saveFields({ target: p });
+      });
+    });
+  })();
+
   // ============================================================ кубы
   // K_DICE is declared at the top, with the other keys that are part of the state.
 
