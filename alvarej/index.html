@@ -705,6 +705,11 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   function zoneOf(el) { return el.closest("[data-zone]"); }
 
   // ------------------------------------------------------------- ярлыки
+  // On a phone the boxes stay where they are (his word, 2026-10-01: «перетаскивание на
+  // телефоне выключи»): a long press there is for the spell card, not for moving a box.
+  var PHONE = window.matchMedia ? matchMedia("(max-width:760px)") : null;
+  function phone() { return !!(PHONE && PHONE.matches); }
+
   function tagBoxes() {
     var seen = {};
     list(".box").forEach(function (b) {
@@ -722,10 +727,17 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
         cap.classList.remove("grab");
         return;
       }
-      cap.setAttribute("draggable", "true");
+      if (phone()) cap.removeAttribute("draggable");
+      else cap.setAttribute("draggable", "true");
       cap.classList.add("grab");
-      cap.title = "Потяни, чтобы переставить. Правой кнопкой — добавить, переименовать, удалить";
+      cap.title = phone() ? "" :
+        "Потяни, чтобы переставить. Правой кнопкой — добавить, переименовать, удалить";
     });
+  }
+  // a phone turned, or a window narrowed past the phone width
+  if (PHONE) {
+    if (PHONE.addEventListener) PHONE.addEventListener("change", tagBoxes);
+    else if (PHONE.addListener) PHONE.addListener(tagBoxes);
   }
 
   // ------------------------------------------------------ свой блок
@@ -1313,6 +1325,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   document.addEventListener("dragstart", function (e) {
     var cap = e.target.closest && e.target.closest(".cap.grab");
     if (!cap) return;
+    if (phone()) { e.preventDefault(); return; }
     dragged = cap.parentElement;
     e.dataTransfer.effectAllowed = "move";
     // Никакого text/plain: при отпускании над редактируемым полем
@@ -2024,23 +2037,64 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
 
     // The card IS the table from his document: its four columns, its merges, its
     // right-aligned labels. Nothing here is rearranged or retold.
+    // On a phone his four-column table is folded into two columns (his request 2026-10-01:
+    // «не 4 в ряд а 2 сверху и 2 снизу, но разделения как у Димастера»). Every cell stays a
+    // cell of its own, with its text, alignment and borders - only where it stands changes.
+    // A row is read as two halves, columns 1-2 and 3-4, the way his tables are built
+    // («Школа: | Очарование || Длительность: | 1 минута»): each half becomes a row of two.
+    // A half that is ONE wide cell (the spell's name, «Время сотворения:») takes the whole
+    // row - unless the other half is one wide cell too, then the two share a row. A cell
+    // across all four columns (the description) stays across the card. Returns null when
+    // there is nothing to fold: a wide screen, or a table that is not four columns.
+    function fold(d) {
+      if (!phone()) return null;
+      if (!d.cols || d.cols.length !== 4) return null;
+      function as(c, span) {
+        return { s: span, a: c.a, p: c.p };
+      }
+      var out = [];
+      d.rows.forEach(function (row) {
+        var left = [], right = [], at = 0;
+        row.forEach(function (c) {
+          var span = c.s || 1;
+          if (span >= 4) out.push([as(c, 2)]);
+          else (at < 2 ? left : right).push({ c: c, s: Math.min(span, 2) });
+          at += span;
+        });
+        var wideL = left.length === 1 && left[0].s === 2;
+        var wideR = right.length === 1 && right[0].s === 2;
+        if (wideL && wideR) {
+          out.push([as(left[0].c, 1), as(right[0].c, 1)]);
+          return;
+        }
+        [left, right].forEach(function (half) {
+          if (!half.length) return;
+          if (half.length === 1) out.push([as(half[0].c, 2)]);
+          else out.push(half.map(function (x) { return as(x.c, x.s); }));
+        });
+      });
+      return out;
+    }
+
     function fill(i) {
       var d = data[i];
       if (!d || !d.rows || !d.rows.length) return false;
       card.textContent = "";
 
       var table = document.createElement("table");
-      var total = (d.cols || []).reduce(function (a, b) { return a + b; }, 0);
+      var folded = fold(d);
+      var cols = folded ? [42, 58] : (d.cols || []);
+      var total = cols.reduce(function (a, b) { return a + b; }, 0);
       if (total) {
         var group = document.createElement("colgroup");
-        d.cols.forEach(function (w) {
+        cols.forEach(function (w) {
           var col = document.createElement("col");
           col.style.width = (100 * w / total).toFixed(2) + "%";
           group.appendChild(col);
         });
         table.appendChild(group);
       }
-      d.rows.forEach(function (row) {
+      (folded || d.rows).forEach(function (row) {
         var tr = document.createElement("tr");
         row.forEach(function (c) {
           var td = document.createElement("td");
