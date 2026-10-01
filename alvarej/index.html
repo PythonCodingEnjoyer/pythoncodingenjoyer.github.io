@@ -121,6 +121,11 @@ body{background:var(--room);font-family:"PT Sans Narrow","Arial Narrow",Arial,sa
    minmax(0,1fr) обязателен: у трека 1fr min-width:auto, и длинное слово
    («Проницательность») распирало строку наружу за рамку блока */
 .ab-rows .sk.floor{grid-template-columns:auto 3.4cqw minmax(0,1fr) auto}
+/* The saving throw is set off from the skills under it by a thin line (his sketch,
+   2026-10-01). Not under a save with nothing below it - Constitution has no skills.
+   The border is in pixels, so it is the same hairline on every page and scale. */
+.ab-rows .sk[data-kind="save"]:not(:last-child){padding-bottom:.55cqw;
+  border-bottom:1px solid var(--hair)}
 .ab-rows .sk .n{flex:none}
 .sk .pv{font-size:1.15cqw;color:var(--dim);font-variant-numeric:tabular-nums;
         min-width:1.7cqw;text-align:right}
