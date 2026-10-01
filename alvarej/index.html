@@ -1589,6 +1589,9 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   // points, no slots, no hit dice, no step of exhaustion.
   var badBtn = document.getElementById("rest-bad");
   if (badBtn) badBtn.addEventListener("click", function () {
+    // It asks first, as the long rest does (his word, 2026-10-01): it clears marks too.
+    if (!confirm("Плохой долгий отдых? Как короткий: вернётся вдохновение барда, снимутся " +
+                 "Благословение и концентрация. Хиты и ячейки НЕ вернутся.")) return;
     shortRest(badBtn, "плохой долгий отдых", "Как короткий · ");
   });
 
