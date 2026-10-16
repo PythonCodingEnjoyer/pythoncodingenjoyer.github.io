@@ -1405,6 +1405,11 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   // difference back as a transform that runs to zero. A drop puts the box where the
   // silhouette stands; a cancelled drag leaves it where it was.
   var dragged = null, ph = null;
+  var dragFromToggle = false;
+  // HTML dragstart targets the draggable header even when the pointer began on its button.
+  document.addEventListener("pointerdown", function (e) {
+    dragFromToggle = !!(e.target.closest && e.target.closest(".collapse-toggle"));
+  }, true);
 
   function boxesIn(zone) {
     return [].slice.call(zone.children).filter(function (c) {
@@ -1459,7 +1464,10 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   }
 
   document.addEventListener("dragstart", function (e) {
-    if (e.target.closest && e.target.closest(".collapse-toggle")) { e.preventDefault(); return; }
+    if (dragFromToggle || (e.target.closest && e.target.closest(".collapse-toggle"))) {
+      e.preventDefault();
+      return;
+    }
     var cap = e.target.closest && e.target.closest(".cap.grab");
     if (!cap) return;
     if (phone()) { e.preventDefault(); return; }
