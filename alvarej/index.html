@@ -34,6 +34,18 @@ body{background:var(--room);font-family:"PT Sans Narrow","Arial Narrow",Arial,sa
      color:var(--ink);-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .stack{display:flex;flex-direction:column;align-items:center;gap:1.4rem;padding:1.4rem 1rem 3rem}
 
+/* A fixed page index keeps every sheet one click away without taking layout space. */
+.sheet-nav{position:fixed;z-index:100;left:.65rem;top:1rem;display:flex;flex-direction:column;
+           gap:.45rem;max-height:calc(100vh - 2rem);overflow:auto;padding:.15rem;
+           scrollbar-width:none}
+.sheet-nav::-webkit-scrollbar{display:none}
+.sheet-nav button{width:2.65rem;height:2.65rem;flex:0 0 auto;border:1px solid var(--hand);
+                  border-radius:.35rem;background:var(--paper);color:var(--hand);
+                  font:700 1rem "PT Sans Narrow","Arial Narrow",Arial,sans-serif;
+                  cursor:pointer;box-shadow:0 1px 4px rgba(0,0,0,.16)}
+.sheet-nav button:hover,.sheet-nav button:focus-visible,.sheet-nav button[aria-current="location"]{
+  background:var(--hand);color:var(--paper);outline:none}
+
 .sheet{
   container-type:inline-size; position:relative;
   width:min(100%,1180px);
@@ -549,8 +561,10 @@ i,em{font-style:normal}
 :root{--k:1}
 @media (max-width:760px){
   :root{--k:2.9}
-  .stack{padding:.5rem .3rem 2rem;gap:.8rem}
+  .stack{padding:.5rem .3rem 2rem 2.6rem;gap:.8rem}
   .sheet{width:100%;border-width:1px}
+  .sheet-nav{left:.2rem;top:.5rem;gap:.3rem;max-height:calc(100vh - 1rem)}
+  .sheet-nav button{width:2rem;height:2rem;font-size:.85rem;opacity:.94}
 
   /* columns one under another... */
   .row{flex-direction:column}
@@ -629,7 +643,7 @@ i,em{font-style:normal}
   .legend{display:none}
   /* The controls are hidden HERE, in the last block of the stylesheet: the same rule
      used to stand above `.dmgbar{display:flex}`, lost the cascade to it and hid nothing. */
-  .ico,.dmgbar,.toast,.aid{display:none}
+  .ico,.dmgbar,.toast,.aid,.sheet-nav{display:none}
 }
 </style>
 </head>
@@ -846,6 +860,70 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       if (meta.columns === 1 || meta.columns === 2) setPageLayout(sh, meta.columns);
     });
   }
+  var pageNav = null;
+  function updatePageNav() {
+    if (!pageNav) return;
+    var sheets = list(".stack > .sheet");
+    pageNav.textContent = "";
+    sheets.forEach(function (sh, index) {
+      var button = document.createElement("button");
+      var heading = sh.querySelector(":scope > .sheet-title");
+      var title = sh.classList.contains("settings") ? "Настройки" :
+        (heading ? heading.textContent.trim() : (sh.dataset.page || "Лист"));
+      button.type = "button";
+      button.textContent = String(index);
+      button.dataset.pageIndex = String(index);
+      button.title = index + " · " + title;
+      button.setAttribute("aria-label", "Лист " + index + ": " + title);
+      pageNav.appendChild(button);
+    });
+    updateActivePageNav();
+  }
+  function updateActivePageNav() {
+    if (!pageNav) return;
+    var sheets = list(".stack > .sheet");
+    var buttons = list("button", pageNav);
+    if (!sheets.length) return;
+    var line = 2;
+    var active = -1;
+    sheets.forEach(function (sh, index) {
+      var rect = sh.getBoundingClientRect();
+      if (rect.top <= line && rect.bottom > line) active = index;
+    });
+    if (active < 0) {
+      var nearest = Infinity;
+      sheets.forEach(function (sh, index) {
+        var distance = Math.abs(sh.getBoundingClientRect().top - line);
+        if (distance < nearest) { nearest = distance; active = index; }
+      });
+    }
+    buttons.forEach(function (button, index) {
+      if (index === active) button.setAttribute("aria-current", "location");
+      else button.removeAttribute("aria-current");
+    });
+  }
+  function initPageNav() {
+    var stack = document.querySelector(".stack");
+    if (!stack) return;
+    pageNav = document.createElement("nav");
+    pageNav.className = "sheet-nav";
+    pageNav.setAttribute("aria-label", "Переход к листам");
+    pageNav.addEventListener("click", function (event) {
+      var button = event.target.closest("button[data-page-index]");
+      if (!button) return;
+      var sh = list(".stack > .sheet")[Number(button.dataset.pageIndex)];
+      if (sh) sh.scrollIntoView({ block: "start", behavior: "smooth" });
+    });
+    document.body.insertBefore(pageNav, stack);
+    updatePageNav();
+    var scheduled = false;
+    addEventListener("scroll", function () {
+      if (scheduled) return;
+      scheduled = true;
+      requestAnimationFrame(function () { scheduled = false; updateActivePageNav(); });
+    }, { passive: true });
+    addEventListener("resize", updateActivePageNav, { passive: true });
+  }
   var zones = [];
   function refreshZones() {
     zones = [];
@@ -862,6 +940,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     zones = zones.filter(function (z) { return !locked(z); });
   }
   restorePages();
+  initPageNav();
   list(".sheet[data-lock]").forEach(function (sh) {
     var extra = document.createElement("div");
     extra.className = "col page-extras";
@@ -1647,6 +1726,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     if (!put(K_PAGES, data)) { flash(false); return; }
     if (Object.prototype.hasOwnProperty.call(patch, "title")) setPageTitle(sh, patch.title);
     if (patch.columns) setPageLayout(sh, patch.columns);
+    updatePageNav();
     refreshZones();
     tagBoxes();
     saveOrder();
@@ -1666,6 +1746,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     data.meta[id] = { title: title.trim(), columns: 2 };
     data.order = list(".sheet[data-page]").map(function (p) { return p.dataset.page; });
     if (!put(K_PAGES, data)) { sh.remove(); flash(false); return; }
+    updatePageNav();
     refreshZones();
     tagBoxes();
     noteChange("добавлен лист");
@@ -1691,6 +1772,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     delete data.meta[id];
     if (!put(K_PAGES, data)) { flash(false); return; }
     sh.remove();
+    updatePageNav();
     refreshZones();
     saveCustom();
     saveOrder();
