@@ -724,6 +724,7 @@ i,em{font-style:normal}
 }
 </style>
 <style id="sheet-ui-style">/* Selected refinements only. Unlisted blocks keep the current sheet's CSS. */
+.cap.grab{-webkit-touch-callout:none}
 html[data-preview-layout="v2"]{--v2-body:16px;--v2-label:13px;--v2-number:28px;--v2-caption:calc(var(--k)*1.14cqw)}
 html[data-preview-layout="v2"] .ident .val{font-size:18px;font-weight:400}
 html[data-preview-layout="v2"] .ident .ln .val{border-bottom-color:var(--hair)}
@@ -1173,10 +1174,11 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   function zoneOf(el) { return el.closest("[data-zone]"); }
 
   // ------------------------------------------------------------- ярлыки
-  // On a phone the boxes stay where they are (his word, 2026-10-01: «перетаскивание на
-  // телефоне выключи»): a long press there is for the spell card, not for moving a box.
+  // Touch headers open actions instead of native HTML dragging, even on wide foldables.
   var PHONE = window.matchMedia ? matchMedia("(max-width:760px)") : null;
+  var TOUCH_POINTER = window.matchMedia ? matchMedia("(pointer:coarse)") : null;
   function phone() { return !!(PHONE && PHONE.matches); }
+  function canDragBlocks() { return !phone() && !(TOUCH_POINTER && TOUCH_POINTER.matches); }
 
   function tagBoxes() {
     var seen = {};
@@ -1196,18 +1198,24 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
         cap.classList.remove("grab");
         return;
       }
-      if (phone()) cap.removeAttribute("draggable");
+      if (!canDragBlocks()) cap.removeAttribute("draggable");
       else cap.setAttribute("draggable", "true");
       cap.classList.add("grab");
-      cap.title = phone() ? "" :
+      cap.title = !canDragBlocks() ? "Удержи заголовок для действий с блоком" :
         "Потяни, чтобы переставить. Правой кнопкой — добавить, переименовать, удалить";
+      if (!cap._blockHoldMenu) {
+        cap._blockHoldMenu = true;
+        onHold(cap, function (target, x, y) {
+          if (target.closest(".collapse-toggle") || locked(b)) return;
+          openMenu(x, y, b, b.closest(".sheet"), zoneOf(b), cap);
+        }, true);
+      }
     });
   }
-  // a phone turned, or a window narrowed past the phone width
-  if (PHONE) {
-    if (PHONE.addEventListener) PHONE.addEventListener("change", tagBoxes);
-    else if (PHONE.addListener) PHONE.addListener(tagBoxes);
-  }
+  [PHONE, TOUCH_POINTER].filter(Boolean).forEach(function (query) {
+    if (query.addEventListener) query.addEventListener("change", tagBoxes);
+    else if (query.addListener) query.addListener(tagBoxes);
+  });
 
   // ------------------------------------------------------ свой блок
   function makeBox(id, title, body) {
@@ -1758,9 +1766,11 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   // silhouette stands; a cancelled drag leaves it where it was.
   var dragged = null, ph = null;
   var dragFromToggle = false;
+  var dragFromTouch = false;
   // HTML dragstart targets the draggable header even when the pointer began on its button.
   document.addEventListener("pointerdown", function (e) {
     dragFromToggle = !!(e.target.closest && e.target.closest(".collapse-toggle"));
+    dragFromTouch = e.pointerType === "touch" || e.pointerType === "pen";
   }, true);
 
   function boxesIn(zone) {
@@ -1823,7 +1833,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     }
     var cap = e.target.closest && e.target.closest(".cap.grab");
     if (!cap) return;
-    if (phone()) { e.preventDefault(); return; }
+    if (!canDragBlocks() || dragFromTouch) { e.preventDefault(); return; }
     dragged = cap.parentElement;
     e.dataTransfer.effectAllowed = "move";
     // Никакого text/plain: при отпускании над редактируемым полем
