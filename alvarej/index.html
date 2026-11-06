@@ -726,9 +726,7 @@ i,em{font-style:normal}
 <style id="sheet-ui-style">/* Selected refinements only. Unlisted blocks keep the current sheet's CSS. */
 .cap.grab{-webkit-touch-callout:none}
 html[data-preview-layout="v2"] .sheet .ed[contenteditable=true]:focus{background:transparent}
-html[data-preview-layout="v2"] .box:has(.ed[contenteditable=true]:focus){
- box-shadow:0 0 0 1px color-mix(in srgb,var(--hand) 22%,transparent),0 0 10px 2px color-mix(in srgb,var(--hand) 18%,transparent)
-}
+::highlight(alvarej-edit-focus){background-color:var(--tint)}
 html[data-preview-layout="v2"]{--v2-body:16px;--v2-label:13px;--v2-number:28px;--v2-caption:calc(var(--k)*1.14cqw)}
 html[data-preview-layout="v2"] .ident .val{font-size:18px;font-weight:400}
 html[data-preview-layout="v2"] .ident .ln .val{border-bottom-color:var(--hair)}
@@ -5355,6 +5353,45 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   var spells = document.querySelector('.sheet[data-page="spells"]');
   if (!combat || !character || !spells) return;
   document.documentElement.dataset.previewLayout = "v2";
+
+  // Paint text ranges instead of editor boxes. This keeps cell layout and saved HTML intact.
+  if (window.CSS && CSS.highlights && window.Highlight) {
+    var focusedEditor = null;
+    function paintEditorText() {
+      CSS.highlights.delete('alvarej-edit-focus');
+      if (!focusedEditor || focusedEditor !== document.activeElement || !focusedEditor.isContentEditable) return;
+      var highlight = new Highlight();
+      var walker = document.createTreeWalker(focusedEditor, NodeFilter.SHOW_TEXT);
+      var node;
+      while ((node = walker.nextNode())) {
+        if (!node.nodeValue.trim()) continue;
+        var locked = node.parentElement.closest('[contenteditable=false]');
+        if (locked && focusedEditor.contains(locked)) continue;
+        var range = document.createRange();
+        range.selectNodeContents(node);
+        highlight.add(range);
+      }
+      if (highlight.size) CSS.highlights.set('alvarej-edit-focus', highlight);
+    }
+    var editorObserver = new MutationObserver(paintEditorText);
+    function followEditorFocus() {
+      editorObserver.disconnect();
+      var active = document.activeElement;
+      focusedEditor = active && active.matches('.sheet .ed[contenteditable=true]') ? active : null;
+      if (focusedEditor) editorObserver.observe(focusedEditor, { childList: true, characterData: true, subtree: true });
+      paintEditorText();
+    }
+    document.addEventListener('focusin', followEditorFocus);
+    document.addEventListener('focusout', function () {
+      editorObserver.disconnect();
+      focusedEditor = null;
+      CSS.highlights.delete('alvarej-edit-focus');
+    });
+    document.addEventListener('input', function (event) {
+      if (focusedEditor && focusedEditor.contains(event.target)) paintEditorText();
+    });
+    followEditorFocus();
+  }
 
   var spellTop = spells.querySelector(':scope > .row');
   spellTop.classList.add('preview-spell-top');
