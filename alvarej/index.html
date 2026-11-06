@@ -886,18 +886,24 @@ html[data-preview-layout="v2"] details[open]>.preview-disclosure-summary::after{
 html[data-preview-layout="v2"] .preview-disclosure-summary:focus-visible{outline:2px solid var(--hand);outline-offset:2px}
 /* Shared hover feedback preserves checked states and never changes geometry. */
 html[data-preview-layout="v2"]{--control-glow:0 0 0 1px rgba(65,145,235,.18),0 0 7px rgba(65,145,235,.3);--text-glow:0 0 6px rgba(65,145,235,.5)}
-html[data-preview-layout="v2"] :is(.dia,#conc-pick,.ico,.btns button,.aidbar button,.dmgbar button,.xpbar button,.step-buttons button,.collapse-toggle){transition:box-shadow .15s ease}
+/* Action buttons fill only while pressed or toggled on, never on hover/focus. */
+html[data-preview-layout="v2"] .sheet :is(.ico,.btns button,.aidbar button,.dmgbar button,.xpbar button,.step-buttons button,.dbar button,.hrow button,#dmg-heal),
+html[data-preview-layout="v2"] .sheet :is(.ico,.btns button,.aidbar button,.dmgbar button,.xpbar button,.step-buttons button,.dbar button,.hrow button,#dmg-heal):is(:hover,:focus-visible){background:var(--paper);color:var(--button-ink,var(--hand))}
+html[data-preview-layout="v2"] .sheet :is(.dmgbar,.xpbar){--button-ink:var(--ink)}
+html[data-preview-layout="v2"] .sheet .btns button.warn{--button-ink:var(--warn)}
+html[data-preview-layout="v2"] .sheet :is(.ico,.btns button,.aidbar button,.dmgbar button,.xpbar button,.step-buttons button,.dbar button,.hrow button,#dmg-heal):is(.on,[aria-pressed="true"],:active):not(:disabled):not([aria-disabled="true"]){background:var(--button-ink,var(--hand));color:var(--paper)}
+html[data-preview-layout="v2"] :is(.dia,#conc-pick,.ico,.btns button,.aidbar button,.dmgbar button,.xpbar button,.step-buttons button,.dbar button,.hrow button,.collapse-toggle){transition:box-shadow .15s ease}
 html[data-preview-layout="v2"] .preview-disclosure-summary{transition:text-shadow .15s ease}
 @media(hover:hover){
  html[data-preview-layout="v2"] .preview-disclosure-summary:hover{text-shadow:var(--text-glow)}
  html[data-preview-layout="v2"] .preview-disclosure-summary:hover::after{filter:drop-shadow(0 0 3px rgba(65,145,235,.5))}
- html[data-preview-layout="v2"] :is(.dia,#conc-pick,.ico,.btns button,.aidbar button,.dmgbar button,.xpbar button,.step-buttons button,.collapse-toggle):not(:disabled):not([aria-disabled="true"]):hover{box-shadow:var(--control-glow)}
+ html[data-preview-layout="v2"] :is(.dia,#conc-pick,.ico,.btns button,.aidbar button,.dmgbar button,.xpbar button,.step-buttons button,.dbar button,.hrow button,.collapse-toggle):not(:disabled):not([aria-disabled="true"]):hover{box-shadow:var(--control-glow)}
  html[data-preview-layout="v2"][data-tune="1"] .pm:hover{filter:drop-shadow(0 0 3px rgba(65,145,235,.5))}
 }
 html[data-preview-layout="v2"] .preview-disclosure-summary:focus-visible{text-shadow:var(--text-glow)}
-html[data-preview-layout="v2"] :is(.dia,#conc-pick,.ico,.btns button,.aidbar button,.dmgbar button,.xpbar button,.step-buttons button,.collapse-toggle):not(:disabled):focus-visible{box-shadow:var(--control-glow)}
+html[data-preview-layout="v2"] :is(.dia,#conc-pick,.ico,.btns button,.aidbar button,.dmgbar button,.xpbar button,.step-buttons button,.dbar button,.hrow button,.collapse-toggle):not(:disabled):focus-visible{box-shadow:var(--control-glow)}
 @media(prefers-reduced-motion:reduce){
- html[data-preview-layout="v2"] :is(.dia,#conc-pick,.ico,.btns button,.aidbar button,.dmgbar button,.xpbar button,.step-buttons button,.collapse-toggle,.preview-disclosure-summary){transition:none}
+ html[data-preview-layout="v2"] :is(.dia,#conc-pick,.ico,.btns button,.aidbar button,.dmgbar button,.xpbar button,.step-buttons button,.dbar button,.hrow button,.collapse-toggle,.preview-disclosure-summary){transition:none}
 }
 html[data-preview-layout="v2"] .preview-spell-legend{font-size:14px;line-height:1.4}
 html[data-preview-layout="v2"] .preview-legend-details{border-top:1px solid var(--hair)}
