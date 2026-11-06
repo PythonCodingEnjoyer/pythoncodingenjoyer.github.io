@@ -725,6 +725,10 @@ i,em{font-style:normal}
 </style>
 <style id="sheet-ui-style">/* Selected refinements only. Unlisted blocks keep the current sheet's CSS. */
 .cap.grab{-webkit-touch-callout:none}
+html[data-preview-layout="v2"] .sheet .ed[contenteditable=true]:focus{background:transparent}
+html[data-preview-layout="v2"] .box:has(.ed[contenteditable=true]:focus){
+ box-shadow:0 0 0 1px color-mix(in srgb,var(--hand) 22%,transparent),0 0 10px 2px color-mix(in srgb,var(--hand) 18%,transparent)
+}
 html[data-preview-layout="v2"]{--v2-body:16px;--v2-label:13px;--v2-number:28px;--v2-caption:calc(var(--k)*1.14cqw)}
 html[data-preview-layout="v2"] .ident .val{font-size:18px;font-weight:400}
 html[data-preview-layout="v2"] .ident .ln .val{border-bottom-color:var(--hair)}
