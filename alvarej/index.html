@@ -728,6 +728,19 @@ i,em{font-style:normal}
 .cap.grab{-webkit-touch-callout:none}
 html[data-preview-layout="v2"] .sheet .ed[contenteditable=true]:focus{background:transparent}
 ::highlight(alvarej-edit-focus){background-color:var(--tint)}
+/* Edge shadows indicate content outside the current dice scroll position. */
+html[data-preview-layout="v2"] .dice-scroll-frame{position:relative;margin-top:calc(var(--k)*.6cqw);min-height:0}
+html[data-preview-layout="v2"] .dice-scroll-frame>.dlog{margin-top:0}
+html[data-preview-layout="v2"] .dice-scroll-frame::before,
+html[data-preview-layout="v2"] .dice-scroll-frame::after{content:"";position:absolute;left:0;right:0;height:18px;max-height:35%;pointer-events:none;z-index:1;opacity:0;transition:opacity .12s ease}
+html[data-preview-layout="v2"] .dice-scroll-frame::before{top:0;background:linear-gradient(to bottom,rgba(0,0,0,.22),transparent);border-radius:4px 4px 0 0}
+html[data-preview-layout="v2"] .dice-scroll-frame::after{bottom:0;background:linear-gradient(to top,rgba(0,0,0,.22),transparent);border-radius:0 0 4px 4px}
+html[data-preview-layout="v2"] .dice-scroll-frame.can-scroll-up::before,
+html[data-preview-layout="v2"] .dice-scroll-frame.can-scroll-down::after{opacity:1}
+@media(prefers-reduced-motion:reduce){
+ html[data-preview-layout="v2"] .dice-scroll-frame::before,
+ html[data-preview-layout="v2"] .dice-scroll-frame::after{transition:none}
+}
 html[data-preview-layout="v2"]{--v2-body:16px;--v2-label:13px;--v2-number:28px;--v2-caption:calc(var(--k)*1.14cqw)}
 html[data-preview-layout="v2"] .ident .val{font-size:18px;font-weight:400}
 html[data-preview-layout="v2"] .row.hdr>.ident{flex-grow:2.4}
@@ -5409,6 +5422,24 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   var spells = document.querySelector('.sheet[data-page="spells"]');
   if (!combat || !character || !spells) return;
   document.documentElement.dataset.previewLayout = "v2";
+
+  var diceLog = document.getElementById('dice-log');
+  if (diceLog) {
+    var diceFrame = document.createElement('div');
+    diceFrame.className = 'dice-scroll-frame';
+    diceLog.before(diceFrame);
+    diceFrame.appendChild(diceLog);
+    function updateDiceScrollHints() {
+      var remaining = diceLog.scrollHeight - diceLog.clientHeight - diceLog.scrollTop;
+      diceFrame.classList.toggle('can-scroll-up', diceLog.scrollTop > 1);
+      diceFrame.classList.toggle('can-scroll-down', remaining > 1);
+    }
+    diceLog.addEventListener('scroll', updateDiceScrollHints, { passive: true });
+    new MutationObserver(updateDiceScrollHints).observe(diceLog, { childList: true, subtree: true, characterData: true });
+    new ResizeObserver(updateDiceScrollHints).observe(diceLog);
+    if (document.fonts) document.fonts.ready.then(updateDiceScrollHints);
+    updateDiceScrollHints();
+  }
 
   // Paint text ranges instead of editor boxes. This keeps cell layout and saved HTML intact.
   if (window.CSS && CSS.highlights && window.Highlight) {
