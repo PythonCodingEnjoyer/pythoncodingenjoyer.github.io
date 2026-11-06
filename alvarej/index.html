@@ -2016,6 +2016,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       twoColumns: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18"/>',
       arrowUp: '<path d="m6 10 6-6 6 6M12 4v16"/>',
       arrowDown: '<path d="m6 14 6 6 6-6M12 4v16"/>',
+      arrowLeft: '<path d="m10 6-6 6 6 6M4 12h16"/>',
+      movePage: '<path d="M13 3H4v18h16V11M12 12 21 3M14 3h7v7"/>',
       merge: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M3 12h6m-3-3 3 3-3 3M21 12h-6m3-3-3 3 3 3"/>',
       split: '<rect x="3" y="4" width="18" height="16" rx="1"/><path d="M12 4v16M9 12H4m3-3-3 3 3 3M15 12h5m-3-3 3 3-3 3"/>'
     };
@@ -2038,7 +2040,11 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       b.appendChild(label);
       if (item[2] === "trash") b.classList.add("danger");
       b.disabled = !!item[3];
-      b.addEventListener("click", function () { closeMenu(); item[1](); });
+      b.addEventListener("click", function (event) {
+        event.stopPropagation();
+        closeMenu();
+        item[1]();
+      });
       menu.appendChild(b);
     });
     menu.hidden = false;
@@ -2075,6 +2081,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     var protectedSheet = sh && (sh.classList.contains("settings") || LOCKED_PAGES[sh.dataset.page]);
     if (box && !locked(box)) {
       if (!protectedSheet) items.push(["Добавить блок ниже", function () { addAfter(box); }, "plus"]);
+      items.push(["Переместить на другой лист", function () { blockMoveMenu(box, x, y); },
+        "movePage", !blockMoveTargets(box).length]);
       items.push(["Переименовать блок", function () { rename(box); }, "edit"]);
       if (canCollapse(box)) {
         items.push([box.classList.contains("collapsed") ? "Развернуть блок" : "Свернуть блок",
@@ -2142,6 +2150,43 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     if (locked(sh)) return sh.querySelector("[data-extra-zone]");
     var row = pageColumns(sh, false);
     return row ? row.querySelector(":scope > .col") : sh;
+  }
+
+  function blockMoveTargets(box) {
+    var current = box.closest(".sheet");
+    return list(".sheet").map(function (sh, index) { return { sheet: sh, index: index }; })
+      .filter(function (target) {
+        return target.index >= 3 && target.sheet !== current && !locked(target.sheet) &&
+          !target.sheet.hasAttribute("data-removed-page");
+      });
+  }
+
+  function blockMoveMenu(box, x, y) {
+    if (!box.isConnected || locked(box)) return;
+    var items = [["Назад", function () {
+      openMenu(x, y, box, box.closest(".sheet"), zoneOf(box), box.firstElementChild);
+    }, "arrowLeft"]];
+    blockMoveTargets(box).forEach(function (target) {
+      items.push(["Лист " + target.index, function () {
+        moveBlockToPage(box, target.sheet);
+      }, "movePage"]);
+    });
+    showMenu(x, y, items, box.firstElementChild);
+  }
+
+  function moveBlockToPage(box, sh) {
+    if (!box.isConnected || locked(box) || !blockMoveTargets(box).some(function (target) {
+      return target.sheet === sh;
+    })) return;
+    var zone = pageZone(sh);
+    if (!takesBoxes(zone)) return;
+    settle("перед переносом блока");
+    zone.appendChild(box);
+    tagBoxes();
+    saveOrder();
+    saveCustom();
+    noteChange("блок перенесён на лист " + list(".sheet").indexOf(sh));
+    box.scrollIntoView({ block: "center", behavior: "smooth" });
   }
 
   function addIn(zone, after) {
