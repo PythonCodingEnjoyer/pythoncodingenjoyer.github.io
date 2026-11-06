@@ -240,14 +240,9 @@ td.dim{color:var(--dim);font-weight:400}
 /* Fixed cells of the spell table: black, but as heavy as the blue ones they replaced. */
 #spelltable td.fx{font-weight:700}
 
-/* Карточка заклинания — таблица ИЗ ЕГО ДОКУМЕНТА, ячейка в ячейку. Шрифт — обычный PT
-   Sans, а не узкий: в документе он обычный, и узкий рядом с ним читается как другая вещь.
-   Кегль и ширину ставит скрипт при каждом показе, и берёт их НЕ по формуле, а у самой
-   таблицы заклинаний: кегль — ровно как у её синих строк, ширина — почти во всю таблицу.
-   Формула от ширины листа промахивалась при другом масштабе браузера: у него текст
-   карточки выходил вдвое крупнее таблицы, а сама карточка — узкой и высокой. Все
-   внутренние размеры в em, чтобы шли за кеглем. cqw тут не годится: карточка висит
-   поверх страницы и ни в одном контейнере не лежит. */
+/* Spell cards retain the DM's table and use PT Sans. The script copies the spell
+   notes' computed font size and table width on opening. Cells must inherit that
+   size: cards live outside the sheet container, where cqw uses the viewport. */
 .spellcard{position:fixed;z-index:110;max-width:calc(100vw - 24px);
            max-height:80vh;overflow:auto;
            background:var(--paper);color:var(--ink);border:2px solid var(--line);
@@ -256,16 +251,14 @@ td.dim{color:var(--dim);font-weight:400}
            pointer-events:none}
 .spellcard.pinned{pointer-events:auto}
 .spellcard[hidden]{display:none}
-/* auto, а не fixed: ширины колонок из документа остаются подсказкой, но подпись вроде
-   «Дистанция:» не имеет права рваться посередине слова. */
+/* Document column widths are hints; desktop labels must remain unbroken. */
 .spellcard table{border-collapse:collapse;width:100%;table-layout:auto}
-.spellcard td{border:1px solid var(--line);padding:.25em .4em;vertical-align:top;
+.spellcard td{font-size:inherit;border:1px solid var(--line);padding:.25em .4em;vertical-align:top;
               word-wrap:break-word}
 .spellcard td.lbl{white-space:nowrap}
 .spellcard p{margin:0 0 .35em;color:var(--ink)}
 .spellcard p:last-child{margin-bottom:0}
-/* Курсив он не любит на ЛИСТЕ, но тут документ — его собственный, и в нём курсивом
-   написано, откуда заклинание. Поэтому общий запрет курсива для карточки снимаем. */
+/* Preserve italics from the DM's document inside cards. */
 .spellcard i{font-style:italic}
 .spellcard s{text-decoration:line-through}
 .spellcard .pin{color:var(--dim);font-size:.85em;padding-top:.4em;text-align:center}
