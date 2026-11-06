@@ -850,8 +850,9 @@ html[data-preview-layout="v2"] .preview-spell-slots .it.locked{display:grid;colo
 html[data-preview-layout="v2"] .preview-spell-slots .it small{display:none}
 html[data-preview-layout="v2"] .preview-spell-slots .pips{justify-content:flex-start}
 html[data-preview-layout="v2"] .preview-spell-concentration .concbox{flex-direction:row;align-items:center;justify-content:center;gap:8px;padding:0 10px 10px}
-html[data-preview-layout="v2"] .preview-spell-concentration .dia.big{width:24px;height:24px;min-width:24px}
-html[data-preview-layout="v2"] .preview-spell-concentration #conc-pick{flex:1;min-width:0;width:auto;font-size:14px}
+html[data-preview-layout="v2"] .preview-spell-concentration{--concentration-control-size:32px}
+html[data-preview-layout="v2"] .preview-spell-concentration .dia.big{width:var(--concentration-control-size);height:var(--concentration-control-size);min-width:var(--concentration-control-size)}
+html[data-preview-layout="v2"] .preview-spell-concentration #conc-pick{flex:1;min-width:0;width:auto;font-size:14px;height:var(--concentration-control-size);padding-block:0}
 @media(min-width:761px) and (max-width:1000px){
  html[data-preview-layout="v2"] .preview-spell-top{grid-template-columns:190px minmax(0,1fr)}
  html[data-preview-layout="v2"] .preview-spell-concentration{grid-column:1/-1}
