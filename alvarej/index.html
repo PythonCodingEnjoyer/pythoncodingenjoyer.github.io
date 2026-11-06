@@ -2249,7 +2249,9 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   function editPageTitle(sh) {
     if (sh.classList.contains("settings") || LOCKED_PAGES[sh.dataset.page]) return;
     var h = sh.querySelector(":scope > .sheet-title");
-    var title = prompt("Заголовок листа (пусто — убрать)", h ? h.textContent : "");
+    var original = { gear: "Вещи", about: "О персонаже", affairs: "Дела",
+      world: "Мир", people: "Люди" }[sh.dataset.page] || "Лист " + list(".sheet").indexOf(sh);
+    var title = prompt("Заголовок листа (пусто — убрать)", h ? h.textContent : original);
     if (title !== null) savePageMeta(sh, { title: title.trim() });
   }
 
