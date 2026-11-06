@@ -719,7 +719,6 @@ i,em{font-style:normal}
 <style id="sheet-ui-style">/* Selected refinements only. Unlisted blocks keep the current sheet's CSS. */
 .cap.grab{-webkit-touch-callout:none}
 html[data-preview-layout="v2"] .sheet .ed[contenteditable=true]:focus{background:transparent}
-::highlight(alvarej-edit-focus){background-color:var(--tint)}
 /* Edge shadows indicate content outside the current dice scroll position. */
 html[data-preview-layout="v2"] .dice-scroll-frame{position:relative;margin-top:calc(var(--k)*.6cqw);min-height:0}
 html[data-preview-layout="v2"] .dice-scroll-frame>.dlog{margin-top:0}
@@ -5438,45 +5437,6 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     new ResizeObserver(updateDiceScrollHints).observe(diceLog);
     if (document.fonts) document.fonts.ready.then(updateDiceScrollHints);
     updateDiceScrollHints();
-  }
-
-  // Paint text ranges instead of editor boxes. This keeps cell layout and saved HTML intact.
-  if (window.CSS && CSS.highlights && window.Highlight) {
-    var focusedEditor = null;
-    function paintEditorText() {
-      CSS.highlights.delete('alvarej-edit-focus');
-      if (!focusedEditor || focusedEditor !== document.activeElement || !focusedEditor.isContentEditable) return;
-      var highlight = new Highlight();
-      var walker = document.createTreeWalker(focusedEditor, NodeFilter.SHOW_TEXT);
-      var node;
-      while ((node = walker.nextNode())) {
-        if (!node.nodeValue.trim()) continue;
-        var locked = node.parentElement.closest('[contenteditable=false]');
-        if (locked && focusedEditor.contains(locked)) continue;
-        var range = document.createRange();
-        range.selectNodeContents(node);
-        highlight.add(range);
-      }
-      if (highlight.size) CSS.highlights.set('alvarej-edit-focus', highlight);
-    }
-    var editorObserver = new MutationObserver(paintEditorText);
-    function followEditorFocus() {
-      editorObserver.disconnect();
-      var active = document.activeElement;
-      focusedEditor = active && active.matches('.sheet .ed[contenteditable=true]') ? active : null;
-      if (focusedEditor) editorObserver.observe(focusedEditor, { childList: true, characterData: true, subtree: true });
-      paintEditorText();
-    }
-    document.addEventListener('focusin', followEditorFocus);
-    document.addEventListener('focusout', function () {
-      editorObserver.disconnect();
-      focusedEditor = null;
-      CSS.highlights.delete('alvarej-edit-focus');
-    });
-    document.addEventListener('input', function (event) {
-      if (focusedEditor && focusedEditor.contains(event.target)) paintEditorText();
-    });
-    followEditorFocus();
   }
 
   var spellTop = spells.querySelector(':scope > .row');
