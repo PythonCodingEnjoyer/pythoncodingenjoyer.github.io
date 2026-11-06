@@ -1704,10 +1704,124 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   menu.hidden = true;
   document.body.appendChild(menu);
   function closeMenu() { menu.hidden = true; }
+  // Keep the document selection when a menu item is pressed.
+  menu.addEventListener("mousedown", function (event) { event.preventDefault(); });
+
+  function textContext(target) {
+    var field = target.closest && target.closest('input,textarea,[contenteditable=true]');
+    if (field && field.matches('input:not([type="text"]):not([type="search"]):not([type="url"]):not([type="tel"]):not([type="email"]):not([type="number"])')) field = null;
+    var control = field && /^(INPUT|TEXTAREA)$/.test(field.tagName);
+    var selection = getSelection(), range = null, value = "", start = 0, end = 0;
+    if (control) {
+      start = field.selectionStart;
+      end = field.selectionEnd;
+      if (start === null || end === null) return null;
+      value = field.value.slice(start, end);
+    } else if (selection && selection.rangeCount) {
+      var selected = selection.getRangeAt(0);
+      if (target.contains(selected.commonAncestorContainer) ||
+          (field && field.contains(selected.commonAncestorContainer))) {
+        range = selected.cloneRange();
+        value = range.toString();
+      }
+    }
+    var source = field || (target.closest && target.closest('.master-entry-text,.ed,.prose,[data-cell]'));
+    if (!source && !value) return null;
+    var editable = !!field && !field.readOnly && !field.disabled;
+    if (editable && !control && !range) {
+      range = document.createRange();
+      range.selectNodeContents(field);
+      range.collapse(false);
+    }
+    var selectedText = !!value;
+    if (!value && source) value = control ? source.value : source.innerText;
+    return { field: field, source: source, control: control, range: range, start: start, end: end,
+      text: value || "", selected: selectedText, editable: editable,
+      original: field && (control ? field.value : field.innerHTML) };
+  }
+
+  function restoreTextContext(context) {
+    var field = context.field;
+    if (!field || !field.isConnected || !context.editable ||
+        (context.control ? field.value : field.innerHTML) !== context.original ||
+        (!context.control && !field.isContentEditable) || field.readOnly || field.disabled) return false;
+    field.focus({ preventScroll: true });
+    if (context.control) field.setSelectionRange(context.start, context.end);
+    else {
+      var selection = getSelection();
+      selection.removeAllRanges();
+      selection.addRange(context.range);
+    }
+    return true;
+  }
+
+  function replaceContextText(context, value, cut) {
+    if (!restoreTextContext(context)) return;
+    var field = context.field;
+    if (!context.selected && cut) {
+      if (context.control) field.select();
+      else {
+        var range = document.createRange();
+        range.selectNodeContents(field);
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+      }
+    }
+    // Native editing commands retain the browser's undo stack and plain-text paste.
+    document.execCommand(cut ? "delete" : "insertText", false, value);
+    field.dispatchEvent(new Event("input", { bubbles: true }));
+  }
+
+  function copyContextText(context) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      return navigator.clipboard.writeText(context.text);
+    }
+    var helper = document.createElement("textarea");
+    helper.value = context.text;
+    helper.style.cssText = "position:fixed;left:-9999px;top:0";
+    document.body.appendChild(helper);
+    helper.select();
+    var copied = false;
+    try { copied = document.execCommand("copy"); } finally { helper.remove(); }
+    return copied ? Promise.resolve() : Promise.reject(new Error("Clipboard unavailable"));
+  }
+
+  function clipboardItems(target) {
+    // Coarse pointers include unfolded phones without adding these actions on desktop.
+    if (!window.matchMedia || !matchMedia("(pointer:coarse)").matches) return [];
+    var context = textContext(target);
+    if (!context) return [];
+    function current() { return textContext(target) || context; }
+    return [
+      ["Скопировать", function () {
+        copyContextText(current()).catch(function () { alert("Не удалось скопировать текст. Попробуй ещё раз."); });
+      }, "copy", !context.text],
+      ["Вырезать", function () {
+        var saved = current();
+        copyContextText(saved).then(function () { replaceContextText(saved, "", true); })
+          .catch(function () { alert("Не удалось скопировать. Текст не изменён."); });
+      }, "cut", !context.editable || !context.text],
+      ["Вставить", function () {
+        var saved = current();
+        function manualPaste() {
+          var value = prompt("Вставь текст из буфера обмена:");
+          if (value !== null) replaceContextText(saved, value, false);
+        }
+        if (navigator.clipboard && navigator.clipboard.readText) {
+          navigator.clipboard.readText().then(function (value) {
+            if (value) replaceContextText(saved, value, false);
+          }).catch(manualPaste);
+        } else manualPaste();
+      }, "paste", !context.editable]
+    ];
+  }
 
   function menuIcon(name) {
     var paths = {
       plus: '<path d="M12 5v14M5 12h14"/>',
+      copy: '<rect x="8" y="8" width="12" height="13" rx="2"/><path d="M16 8V3H3v13h5"/>',
+      cut: '<circle cx="5" cy="5" r="3"/><circle cx="5" cy="19" r="3"/><path d="m7 7 14 14M7 17 21 3"/>',
+      paste: '<path d="M9 4H5v17h14V4h-4"/><rect x="9" y="2" width="6" height="5" rx="1"/>',
       edit: '<path d="m16 3 5 5-12 12-6 1 1-6Z M14 5l5 5"/>',
       collapse: '<path d="m6 15 6-6 6 6"/>',
       expand: '<path d="m6 9 6 6 6-6"/>',
@@ -1726,9 +1840,12 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       (paths[name] || paths.plus) + '</svg>';
   }
 
-  function showMenu(x, y, items) {
+  function showMenu(x, y, items, target) {
     menu.textContent = "";
+    var clips = target ? clipboardItems(target) : [];
+    if (clips.length) items = clips.concat(items.length ? [null].concat(items) : []);
     items.forEach(function (item) {
+      if (!item) { menu.appendChild(document.createElement("hr")); return; }
       var b = document.createElement("button");
       b.type = "button";
       b.setAttribute("role", "menuitem");
@@ -1737,16 +1854,40 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       label.textContent = item[0];
       b.appendChild(label);
       if (item[2] === "trash") b.classList.add("danger");
+      b.disabled = !!item[3];
       b.addEventListener("click", function () { closeMenu(); item[1](); });
       menu.appendChild(b);
     });
     menu.hidden = false;
-    var w = menu.offsetWidth, h = menu.offsetHeight;
-    menu.style.left = Math.max(8, Math.min(x, innerWidth - w - 8)) + "px";
-    menu.style.top = Math.max(8, Math.min(y, innerHeight - h - 8)) + "px";
+    function place() {
+      var viewport = window.visualViewport;
+      var left = viewport ? viewport.offsetLeft : 0, top = viewport ? viewport.offsetTop : 0;
+      var width = viewport ? viewport.width : innerWidth, height = viewport ? viewport.height : innerHeight;
+      menu.style.maxWidth = Math.max(0, width - 16) + "px";
+      menu.style.minWidth = Math.min(208, Math.max(0, width - 16)) + "px";
+      menu.style.maxHeight = Math.max(0, height - 16) + "px";
+      var context = target && textContext(target), rect = null;
+      if (context && context.selected && context.range) rect = context.range.getBoundingClientRect();
+      if (!rect || !rect.height) rect = target && target.getBoundingClientRect();
+      var above = Math.max(0, (rect ? rect.top : y) - top - 12);
+      var below = Math.max(0, top + height - (rect ? rect.bottom : y) - 12);
+      var up = above >= menu.offsetHeight || above > below;
+      var room = up ? above : below;
+      if (room >= 80) menu.style.maxHeight = Math.min(height - 16, room) + "px";
+      var w = menu.offsetWidth, h = menu.offsetHeight;
+      var menuTop = up ? (rect ? rect.top : y) - h - 12 : (rect ? rect.bottom : y) + 12;
+      menu.style.left = Math.max(left + 8, Math.min(x, left + width - w - 8)) + "px";
+      menu.style.top = Math.max(top + 8, Math.min(menuTop, top + height - h - 8)) + "px";
+    }
+    place();
+    menu.reposition = place;
   }
 
-  function openMenu(x, y, box, sh, zone) {
+  document.addEventListener("selectionchange", function () {
+    if (!menu.hidden && menu.reposition) menu.reposition();
+  });
+
+  function openMenu(x, y, box, sh, zone, target) {
     var items = [];
     var protectedSheet = sh && (sh.classList.contains("settings") || LOCKED_PAGES[sh.dataset.page]);
     if (box && !locked(box)) {
@@ -1777,7 +1918,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
         }
       }
     }
-    if (items.length) showMenu(x, y, items);
+    if (items.length || (target && clipboardItems(target).length)) showMenu(x, y, items, target);
     else closeMenu();
   }
 
@@ -1788,8 +1929,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     if (!sh) { closeMenu(); return; }
     e.preventDefault();
     var combatRow = e.target.closest("#combat tr[data-combat-row]");
-    if (combatRow) { showMenu(e.clientX, e.clientY, combatRowMenu(combatRow)); return; }
-    openMenu(e.clientX, e.clientY, box, sh, e.target.closest("[data-zone]"));
+    if (combatRow) { showMenu(e.clientX, e.clientY, combatRowMenu(combatRow), e.target); return; }
+    openMenu(e.clientX, e.clientY, box, sh, e.target.closest("[data-zone]"), e.target);
   });
   document.addEventListener("click", function (e) {
     if (!e.target.closest("#boxmenu")) closeMenu();
@@ -1797,8 +1938,14 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape") closeMenu();
   });
-  addEventListener("scroll", closeMenu, true);
+  addEventListener("scroll", function (event) {
+    if (event.target !== menu) closeMenu();
+  }, true);
   addEventListener("resize", closeMenu);
+  if (window.visualViewport) {
+    visualViewport.addEventListener("resize", closeMenu);
+    visualViewport.addEventListener("scroll", closeMenu);
+  }
   document.addEventListener("pointerdown", function (e) {
     if (!e.target.closest("#boxmenu")) closeMenu();
   }, true);
@@ -3247,7 +3394,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       if (!button || !t.contains(button)) return;
       event.stopPropagation();
       var rect = button.getBoundingClientRect();
-      showMenu(rect.right, rect.bottom, combatRowMenu(button.closest("tr[data-combat-row]")));
+      showMenu(rect.right, rect.bottom, combatRowMenu(button.closest("tr[data-combat-row]")), button);
     });
     var moving = null, targetRow = null, dropAfter = false;
     function clearDrop() {
@@ -3847,7 +3994,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       showMenu(x, y, [
         ["Редактировать", function () { edit(id); }, "edit"],
         ["Удалить", function () { remove(id); }, "trash"]
-      ]);
+      ], entry.querySelector(".master-entry-text"));
       return true;
     }
     log.addEventListener("contextmenu", function (event) {
