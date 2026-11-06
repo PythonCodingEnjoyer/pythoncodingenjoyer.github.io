@@ -200,6 +200,7 @@ td.dim{color:var(--dim);font-weight:400}
 /* Table-cell height is a minimum: empty rows stay writable and text can grow. */
 #combat td{height:2em}
 #combat td:first-child{position:relative;padding-left:22px}
+#combat .combat-name-cell{cursor:text}
 .combat-cell-text{min-height:1.2em}
 .combat-grip{position:absolute;left:1px;top:50%;transform:translateY(-50%);
   display:flex;align-items:center;justify-content:center;width:20px;height:28px;
@@ -3426,6 +3427,37 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     return fields;
   }
 
+  function focusCombatCell(event) {
+    if (event.target.closest(".combat-grip")) return;
+    var editor = event.currentTarget.querySelector(".combat-cell-text");
+    if (!editor || editor.contains(event.target)) return;
+    var selection = getSelection();
+    if (selection && !selection.isCollapsed && editor.contains(selection.anchorNode)) {
+      editor.focus({ preventScroll: true });
+      return;
+    }
+    var caret = null;
+    if (document.caretPositionFromPoint) {
+      var point = document.caretPositionFromPoint(event.clientX, event.clientY);
+      if (point) {
+        caret = document.createRange();
+        caret.setStart(point.offsetNode, point.offset);
+        caret.collapse(true);
+      }
+    } else if (document.caretRangeFromPoint) {
+      caret = document.caretRangeFromPoint(event.clientX, event.clientY);
+    }
+    if (!caret || !editor.contains(caret.startContainer)) {
+      var bounds = editor.getBoundingClientRect();
+      caret = document.createRange();
+      caret.selectNodeContents(editor);
+      caret.collapse(event.clientY < bounds.top || event.clientX < bounds.left);
+    }
+    editor.focus({ preventScroll: true });
+    selection.removeAllRanges();
+    selection.addRange(caret);
+  }
+
   function addCombatRowControl(tr) {
     if (tr.querySelector(".combat-grip")) return;
     var td = tr.firstElementChild;
@@ -3451,6 +3483,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       '<path d="M9 5h.01M15 5h.01M9 12h.01M15 12h.01M9 19h.01M15 19h.01"/></svg>';
     td.appendChild(button);
     td.appendChild(text);
+    // A direct cell listener also makes touch hit-testing include the cell padding.
+    td.addEventListener("click", focusCombatCell);
   }
 
   function appendCombatRow(index, fields) {
