@@ -736,6 +736,7 @@ html[data-preview-layout="v2"]{--v2-body:16px;--v2-label:13px;--v2-number:28px;-
 html[data-preview-layout="v2"] .ident .val{font-size:18px;font-weight:400}
 html[data-preview-layout="v2"] .row.hdr>.ident{flex-grow:2.4}
 html[data-preview-layout="v2"] .row.hdr>.vitals{flex-grow:4.65;min-width:min-content}
+html[data-preview-layout="v2"] .vitals>.vit:first-child{min-width:min-content}
 html[data-preview-layout="v2"] .vitals>.vit:nth-child(2){flex-grow:1.2;min-width:min-content}
 html[data-preview-layout="v2"] .ident .ln .val{border-bottom-color:var(--hair)}
 html[data-preview-layout="v2"] .sheet .lab{text-transform:lowercase}
@@ -834,7 +835,7 @@ html[data-preview-layout="v2"] .vitals>.vit:nth-child(-n+2){
  display:grid;grid-template-rows:32px 54px minmax(18px,1fr) 24px;justify-content:stretch;align-content:start;gap:6px;padding:10px 6px
 }
 html[data-preview-layout="v2"] .vitals>.vit:first-child>.conditions-note{grid-row:3;align-self:end;font-size:var(--v2-caption);font-weight:400;line-height:16px;min-height:16px}
-html[data-preview-layout="v2"] .vitals>.vit:first-child>.dmgbar{grid-row:4;align-self:start;height:24px;padding-top:0}
+html[data-preview-layout="v2"] .vitals>.vit:first-child>.dmgbar{grid-row:4;align-self:start;height:24px;padding-top:0;gap:3px}
 html[data-preview-layout="v2"] .vitals>.vit:nth-child(2)>.aid{display:contents}
 html[data-preview-layout="v2"] .vitals>.vit:nth-child(2) .aid>.lab{grid-row:3;align-self:end;text-align:center;font-size:var(--v2-caption);line-height:16px;padding:0}
 html[data-preview-layout="v2"] .vitals>.vit:nth-child(2) .aidbar{grid-row:4;align-self:start;align-items:center;height:24px;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(28px,1fr);gap:3px;overflow:visible}
