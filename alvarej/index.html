@@ -719,18 +719,18 @@ i,em{font-style:normal}
 <style id="sheet-ui-style">/* Selected refinements only. Unlisted blocks keep the current sheet's CSS. */
 .cap.grab{-webkit-touch-callout:none}
 html[data-preview-layout="v2"] .sheet .ed[contenteditable=true]:focus{background:transparent}
-/* Edge shadows indicate content outside the current dice scroll position. */
-html[data-preview-layout="v2"] .dice-scroll-frame{position:relative;margin-top:calc(var(--k)*.6cqw);min-height:0}
-html[data-preview-layout="v2"] .dice-scroll-frame>.dlog{margin-top:0}
-html[data-preview-layout="v2"] .dice-scroll-frame::before,
-html[data-preview-layout="v2"] .dice-scroll-frame::after{content:"";position:absolute;left:0;right:0;height:18px;max-height:35%;pointer-events:none;z-index:1;opacity:0;transition:opacity .12s ease}
-html[data-preview-layout="v2"] .dice-scroll-frame::before{top:0;background:linear-gradient(to bottom,rgba(0,0,0,.08),transparent);border-radius:4px 4px 0 0}
-html[data-preview-layout="v2"] .dice-scroll-frame::after{bottom:0;background:linear-gradient(to top,rgba(0,0,0,.08),transparent);border-radius:0 0 4px 4px}
-html[data-preview-layout="v2"] .dice-scroll-frame.can-scroll-up::before,
-html[data-preview-layout="v2"] .dice-scroll-frame.can-scroll-down::after{opacity:1}
+/* Shared edge shadows indicate hidden content in dice and edit history. */
+html[data-preview-layout="v2"] .scroll-hint-frame{position:relative;margin-top:calc(var(--k)*.6cqw);min-height:0;min-width:0}
+html[data-preview-layout="v2"] .scroll-hint-frame>:is(.dlog,#history){margin-top:0}
+html[data-preview-layout="v2"] .scroll-hint-frame::before,
+html[data-preview-layout="v2"] .scroll-hint-frame::after{content:"";position:absolute;left:0;right:0;height:18px;max-height:35%;pointer-events:none;z-index:1;opacity:0;transition:opacity .12s ease}
+html[data-preview-layout="v2"] .scroll-hint-frame::before{top:0;background:linear-gradient(to bottom,rgba(0,0,0,.08),transparent);border-radius:4px 4px 0 0}
+html[data-preview-layout="v2"] .scroll-hint-frame::after{bottom:0;background:linear-gradient(to top,rgba(0,0,0,.08),transparent);border-radius:0 0 4px 4px}
+html[data-preview-layout="v2"] .scroll-hint-frame.can-scroll-up::before,
+html[data-preview-layout="v2"] .scroll-hint-frame.can-scroll-down::after{opacity:1}
 @media(prefers-reduced-motion:reduce){
- html[data-preview-layout="v2"] .dice-scroll-frame::before,
- html[data-preview-layout="v2"] .dice-scroll-frame::after{transition:none}
+ html[data-preview-layout="v2"] .scroll-hint-frame::before,
+ html[data-preview-layout="v2"] .scroll-hint-frame::after{transition:none}
 }
 html[data-preview-layout="v2"]{--v2-body:16px;--v2-label:13px;--v2-number:28px;--v2-caption:calc(var(--k)*1.14cqw)}
 html[data-preview-layout="v2"] .ident .val{font-size:18px;font-weight:400}
@@ -5746,23 +5746,24 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     paintPreference();
   })();
 
-  var diceLog = document.getElementById('dice-log');
-  if (diceLog) {
-    var diceFrame = document.createElement('div');
-    diceFrame.className = 'dice-scroll-frame';
-    diceLog.before(diceFrame);
-    diceFrame.appendChild(diceLog);
-    function updateDiceScrollHints() {
-      var remaining = diceLog.scrollHeight - diceLog.clientHeight - diceLog.scrollTop;
-      diceFrame.classList.toggle('can-scroll-up', diceLog.scrollTop > 1);
-      diceFrame.classList.toggle('can-scroll-down', remaining > 1);
+  ['dice-log', 'history'].forEach(function (id) {
+    var scroller = document.getElementById(id);
+    if (!scroller) return;
+    var frame = document.createElement('div');
+    frame.className = 'scroll-hint-frame';
+    scroller.before(frame);
+    frame.appendChild(scroller);
+    function updateScrollHints() {
+      var remaining = scroller.scrollHeight - scroller.clientHeight - scroller.scrollTop;
+      frame.classList.toggle('can-scroll-up', scroller.scrollTop > 1);
+      frame.classList.toggle('can-scroll-down', remaining > 1);
     }
-    diceLog.addEventListener('scroll', updateDiceScrollHints, { passive: true });
-    new MutationObserver(updateDiceScrollHints).observe(diceLog, { childList: true, subtree: true, characterData: true });
-    new ResizeObserver(updateDiceScrollHints).observe(diceLog);
-    if (document.fonts) document.fonts.ready.then(updateDiceScrollHints);
-    updateDiceScrollHints();
-  }
+    scroller.addEventListener('scroll', updateScrollHints, { passive: true });
+    new MutationObserver(updateScrollHints).observe(scroller, { childList: true, subtree: true, characterData: true });
+    new ResizeObserver(updateScrollHints).observe(scroller);
+    if (document.fonts) document.fonts.ready.then(updateScrollHints);
+    updateScrollHints();
+  });
 
   var spellTop = spells.querySelector(':scope > .row');
   spellTop.classList.add('preview-spell-top');
