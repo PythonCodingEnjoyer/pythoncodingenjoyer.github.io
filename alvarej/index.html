@@ -749,9 +749,11 @@ html[data-preview-layout="v2"] .ident [data-id="character-name"]{font-weight:700
 html[data-preview-layout="v2"] .ab-top .lab{display:none}
 html[data-preview-layout="v2"] .ab-top .mod{width:56px;height:56px;font-size:28px;font-weight:400}
 html[data-preview-layout="v2"] .ab-top .sc{width:36px;height:32px;font-size:20px;font-weight:400}
-html[data-preview-layout="v2"] .ab-rows .sk .n{font-weight:400}
-html[data-preview-layout="v2"] .ab-rows .sk{grid-template-columns:18px 34px minmax(0,1fr);column-gap:5px;align-items:center}
-html[data-preview-layout="v2"] .ab-rows .sk.floor{grid-template-columns:18px 34px minmax(0,1fr) auto}
+/* Size the modifier track to its text scale so narrow columns keep room for names. */
+html[data-preview-layout="v2"] .ab-rows .sk .n{width:3ch;min-width:0;font-weight:400;font-variant-numeric:tabular-nums}
+html[data-preview-layout="v2"] .ab-rows .sk{grid-template-columns:18px max-content minmax(0,1fr);column-gap:4px;align-items:center}
+html[data-preview-layout="v2"] .ab-rows .sk.floor{grid-template-columns:18px max-content minmax(0,1fr) auto}
+html[data-preview-layout="v2"] .ab-rows .sk .t{min-width:0;overflow-wrap:anywhere}
 html[data-preview-layout="v2"] .ab-rows .pm{width:18px;height:18px;justify-self:center;align-self:center;position:relative;top:1px}
 html[data-preview-layout="v2"] [data-pool="hd"]{justify-content:center;align-content:center;align-self:center;margin-inline:auto}
 html[data-preview-layout="v2"] .tile{height:76px;padding:0;gap:0;justify-content:flex-start}
