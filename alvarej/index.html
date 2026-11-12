@@ -244,31 +244,40 @@ td.dim{color:var(--dim);font-weight:400}
 /* Fixed cells of the spell table: black, but as heavy as the blue ones they replaced. */
 #spelltable td.fx{font-weight:700}
 
-/* Spell cards retain the DM's table and use PT Sans. The script copies the spell
-   notes' computed font size and table width on opening. Cells must inherit that
-   size: cards live outside the sheet container, where cqw uses the viewport. */
-.spellcard{position:fixed;z-index:110;max-width:calc(100vw - 24px);
+/* Spell cards follow the DM document, not the sheet's condensed typeface or
+   viewport-sized cells. Keep this component's typography fixed at document scale. */
+.spellcard{position:fixed;z-index:110;width:680px;max-width:calc(100vw - 24px);
            max-height:80vh;overflow:auto;
-           background:var(--paper);color:var(--ink);border:2px solid var(--line);
-           border-radius:.35em;padding:.5em;box-shadow:0 .5em 1.6em rgba(0,0,0,.28);
-           font-family:"PT Sans",Arial,sans-serif;font-size:14px;line-height:1.3;
+           background:var(--paper);color:var(--ink);border:0;
+           border-radius:0;padding:0;box-shadow:0 .4em 1.3em rgba(0,0,0,.2);
+           font-family:Arial,sans-serif;font-size:13pt;font-weight:400;line-height:1;
            pointer-events:none}
 .spellcard.pinned{pointer-events:auto}
 .spellcard[hidden]{display:none}
-/* Document column widths are hints; desktop labels must remain unbroken. */
-.spellcard table{border-collapse:collapse;width:100%;table-layout:auto}
-.spellcard td{font-size:inherit;border:1px solid var(--line);padding:.25em .4em;vertical-align:top;
-              word-wrap:break-word}
-.spellcard td.lbl{white-space:nowrap}
-.spellcard p{margin:0 0 .35em;color:var(--ink)}
-.spellcard p:last-child{margin-bottom:0}
-/* Preserve italics from the DM's document inside cards. */
+.spellcard table{border-collapse:collapse;width:100%;table-layout:fixed;font:inherit}
+.spellcard td{font:inherit;border:1px solid var(--line);padding:3px 4px;vertical-align:middle;
+               overflow-wrap:anywhere}
+.spellcard tr:last-child td{border-bottom:1px solid var(--line)}
+.spellcard .spell-meta-pair{display:grid;grid-template-columns:minmax(min-content,var(--label-width)) minmax(0,1fr);gap:6px;align-items:center}
+.spellcard .spell-meta-label{text-align:right;overflow-wrap:normal}
+.spellcard .spell-meta-value{text-align:left}
+.spellcard td.spell-title{text-align:left;padding-inline:10px}
+.spellcard td.spell-title>p:first-child>b:first-child{font-size:16pt}
+.spellcard p{margin:0;color:inherit}
+.spellcard .spell-description{vertical-align:top}
+.spellcard .spell-description p{text-indent:.55em}
+/* Preserve the document's emphasis, including crossed-out components. */
 .spellcard i{font-style:italic}
 .spellcard s{text-decoration:line-through}
-.spellcard .pin{color:var(--dim);font-size:.85em;padding-top:.4em;text-align:center}
-@media(max-width:760px){
-  .spellcard table{table-layout:fixed}
-  .spellcard td.lbl{white-space:normal}
+.spellcard .pin{color:var(--dim);font-size:12px;padding:6px;text-align:center}
+@media(max-width:600px){
+  .spellcard{font-size:12pt}
+  .spellcard .spell-meta-pair{grid-template-columns:max-content minmax(0,1fr)}
+  .spellcard colgroup{display:none}
+  .spellcard table,.spellcard tbody{display:block}
+  .spellcard tr{display:grid;grid-template-columns:minmax(0,1fr)}
+  .spellcard td{display:block;min-width:0;border-top:0}
+  .spellcard tr:first-of-type>td:first-child{border-top:1px solid var(--line)}
 }
 .tw{flex:0 0 auto}
 
@@ -3311,45 +3320,43 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       return node;
     }
 
-    // The card IS the table from his document: its four columns, its merges, its
-    // right-aligned labels. Nothing here is rearranged or retold.
-    // On a phone his four-column table is folded into two columns (his request 2026-10-01:
-    // «не 4 в ряд а 2 сверху и 2 снизу, но разделения как у Димастера»). Every cell stays a
-    // cell of its own, with its text, alignment and borders - only where it stands changes.
-    // A row is read as two halves, columns 1-2 and 3-4, the way his tables are built
-    // («Школа: | Очарование || Длительность: | 1 минута»): each half becomes a row of two.
-    // A half that is ONE wide cell (the spell's name, «Время сотворения:») takes the whole
-    // row - unless the other half is one wide cell too, then the two share a row. A cell
-    // across all four columns (the description) stays across the card. Returns null when
-    // there is nothing to fold: a wide screen, or a table that is not four columns.
-    function fold(d) {
-      if (!phone()) return null;
-      if (!d.cols || d.cols.length !== 4) return null;
-      function as(c, span) {
-        return { s: span, a: c.a, p: c.p };
+    // The DM's four logical columns visually form two: label/value pairs have
+    // no dividing border. Keep their original alignment and every source run and
+    // paragraph inside borderless pairs. Stored document data stays untouched.
+    function cardRows(d) {
+      var cols = d.cols || [];
+      var paired = cols.length === 4;
+      function width(start, end) {
+        return cols.slice(start, end).reduce(function (a, b) { return a + b; }, 0);
       }
-      var out = [];
-      d.rows.forEach(function (row) {
-        var left = [], right = [], at = 0;
-        row.forEach(function (c) {
-          var span = c.s || 1;
-          if (span >= 4) out.push([as(c, 2)]);
-          else (at < 2 ? left : right).push({ c: c, s: Math.min(span, 2) });
-          at += span;
-        });
-        var wideL = left.length === 1 && left[0].s === 2;
-        var wideR = right.length === 1 && right[0].s === 2;
-        if (wideL && wideR) {
-          out.push([as(left[0].c, 1), as(right[0].c, 1)]);
-          return;
+      return d.rows.map(function (row, index) {
+        var out = [], at = 0;
+        for (var i = 0; i < row.length; i++) {
+          var c = row[i], span = c.s || 1;
+          var value = paired && c.a === "right" && row[i + 1];
+          if (value) {
+            var end = at + span + (value.s || 1);
+            out.push({ s: (span + (value.s || 1)) / 2, parts: [c, value],
+              labelWidth: 100 * width(at, at + span) / width(at, end), kind: "spell-meta" });
+            at = end;
+            i++;
+          } else {
+            out.push({ s: paired ? span / 2 : span, a: c.a, p: c.p,
+              kind: index === 0 && i === 0 ? "spell-title" :
+                    row.length === 1 ? "spell-description" : "" });
+            at += span;
+          }
         }
-        [left, right].forEach(function (half) {
-          if (!half.length) return;
-          if (half.length === 1) out.push([as(half[0].c, 2)]);
-          else out.push(half.map(function (x) { return as(x.c, x.s); }));
-        });
+        return out;
       });
-      return out;
+    }
+
+    function appendParagraphs(parent, paras) {
+      (paras || []).forEach(function (para) {
+        var p = document.createElement("p");
+        para.forEach(function (r) { p.appendChild(runNode(r)); });
+        parent.appendChild(p);
+      });
     }
 
     function fill(i) {
@@ -3361,8 +3368,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       card.classList.toggle("pinned", pinned);
 
       var table = document.createElement("table");
-      var folded = fold(d);
-      var cols = folded ? [42, 58] : (d.cols || []);
+      var cols = d.cols || [];
+      if (cols.length === 4) cols = [cols[0] + cols[1], cols[2] + cols[3]];
       var total = cols.reduce(function (a, b) { return a + b; }, 0);
       if (total) {
         var group = document.createElement("colgroup");
@@ -3373,20 +3380,25 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
         });
         table.appendChild(group);
       }
-      (folded || d.rows).forEach(function (row) {
+      cardRows(d).forEach(function (row) {
         var tr = document.createElement("tr");
         row.forEach(function (c) {
           var td = document.createElement("td");
           if (c.s > 1) td.colSpan = c.s;
           if (c.a) td.style.textAlign = c.a;
-          // Прижатые вправо ячейки в его таблицах — это подписи («Школа:», «Дистанция:»),
-          // и рваться посередине слова они не должны.
-          if (c.a === "right") td.className = "lbl";
-          (c.p || []).forEach(function (para) {
-            var p = document.createElement("p");
-            para.forEach(function (r) { p.appendChild(runNode(r)); });
-            td.appendChild(p);
-          });
+          if (c.kind) td.className = c.kind;
+          if (c.parts) {
+            var pair = document.createElement("div");
+            pair.className = "spell-meta-pair";
+            pair.style.setProperty("--label-width", c.labelWidth + "%");
+            c.parts.forEach(function (part, n) {
+              var group = document.createElement("div");
+              group.className = n ? "spell-meta-value" : "spell-meta-label";
+              appendParagraphs(group, part.p);
+              pair.appendChild(group);
+            });
+            td.appendChild(pair);
+          } else appendParagraphs(td, c.p);
           tr.appendChild(td);
         });
         table.appendChild(tr);
@@ -3401,25 +3413,9 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       return true;
     }
 
-    // Кегль и ширина карточки берутся У САМОЙ ТАБЛИЦЫ, а не по формуле. Он попросил
-    // прямо: «текст размером должен быть такой же, как у заклинаний синим». Формула от
-    // ширины листа попадала только при моём масштабе браузера, а при его — давала текст
-    // вдвое крупнее таблицы и карточку узкую и высокую. Так что: кегль — ровно как у
-    // ячейки таблицы, ширина — почти во всю таблицу. Тогда строки его документа
-    // становятся длинными и короткими, а не столбиком.
-    function scale() {
-      var table = document.getElementById("spelltable");
-      var td = table && table.querySelector("td.ed");
-      card.style.fontSize = (td ? parseFloat(getComputedStyle(td).fontSize) : 14) + "px";
-      var tw = table ? table.getBoundingClientRect().width : 900;
-      card.style.width = Math.round(phone() ? innerWidth - 24 : Math.min(tw * 0.92, innerWidth - 24)) + "px";
-    }
-
-    // Широкую карточку не за курсором водить, а ставить ровно над таблицей: по
-    // горизонтали по центру таблицы, по вертикали — сразу под строкой, на которую
-    // наведён указатель, чтобы сама строка оставалась видна.
+    // CSS owns document-scale typography and a bounded reading width. Keep the
+    // card centered over its table and inside the viewport, including on phones.
     function place(x, y) {
-      scale();
       card.hidden = false;
       var r = card.getBoundingClientRect();
       var t = table.getBoundingClientRect();
