@@ -957,6 +957,8 @@ html[data-preview-layout="v2"] .spell-cast-effect[data-style="portal"] .spell-ef
 html[data-preview-layout="v2"] .spell-cast-effect[data-style="thunder"] .spell-effect-wave{stroke-width:1.6}
 html[data-preview-layout="v2"] .spell-cast-effect[data-style="veil"] .spell-effect-wave{stroke-width:1;stroke-dasharray:2 5}
 html[data-preview-layout="v2"] .spell-cast-effect[data-style="heal"] .spell-effect-wave-secondary{stroke-dasharray:1 4}
+html[data-preview-layout="v2"] .spell-effect-concentration{color:#c4a56a;stroke:currentColor;stroke-width:1.5;animation:spell-fx-lift 900ms ease-out both}
+html[data-preview-layout="v2"] .spell-cast-effect[data-mode="light"] .spell-effect-concentration{display:none}
 @keyframes spell-fx-wave-light{0%{opacity:0;transform:scale(.6)}18%{opacity:.34}100%{opacity:0;transform:scale(2.7)}}
 @keyframes spell-fx-wave-full{0%{opacity:0;transform:scale(.45)}16%{opacity:.5}100%{opacity:0;transform:scale(3.8)}}
 @keyframes spell-fx-core{0%{opacity:0;transform:scale(.5)}18%{opacity:.48}55%{opacity:.15;transform:scale(1.5)}100%{opacity:0;transform:scale(2.4)}}
@@ -2951,7 +2953,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     '<button type="button" id="level-cancel">Отмена</button><button type="submit">Применить уровень</button></div></form>';
   levelDialog.setAttribute("aria-labelledby", "level-title");
   document.body.appendChild(levelDialog);
-  var nextLevel = null;
+  var nextLevel = null, levelChangeOrigin = null;
   function levelRoll() {
     if (document.getElementById("level-hp-mode").value === "fixed") return 5;
     var raw = document.getElementById("level-hp-roll").value;
@@ -2968,9 +2970,10 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       Math.max(read("hp-aid", 0) + 1, read("hp-max", 0) + (down ? -hp : hp)) +
       " (" + (down ? "−" : "+") + hp + ": кость " + roll + ", Телосложение " + sign(scoreMod("con")) + ").";
   }
-  function openLevel(next) {
+  function openLevel(next, origin) {
     nextLevel = bounded(next, 1, 20, sheetLevel());
     if (nextLevel === sheetLevel()) return;
+    levelChangeOrigin = origin;
     var target = nextLevel > sheetLevel() ? nextLevel : sheetLevel();
     var remembered = progression.hpRolls[target];
     var recordedDecrease = nextLevel < sheetLevel() && remembered !== undefined;
@@ -3002,6 +3005,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     write("level", nextLevel); touch(cell("level"));
     saveProgress("уровень " + old + " → " + nextLevel);
     levelDialog.close();
+    actionEffect({ key: "progression-level", kind: "progression", amount: nextLevel - old, button: levelChangeOrigin });
     showHpToast("Уровень " + nextLevel + " · мастерство " + sign(2 + Math.floor((nextLevel - 1) / 4)) +
       " · всё пересчитано");
   });
@@ -3009,7 +3013,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     var button = event.target.closest && event.target.closest("[data-step]");
     if (!button || !tuneOn || button.disabled) return;
     var key = button.dataset.step, delta = Number(button.dataset.delta);
-    if (key === "level") { openLevel(sheetLevel() + delta); return; }
+    if (key === "level") { openLevel(sheetLevel() + delta, button); return; }
+    var before = key === "speed" ? progression.speed : scoreValue(key);
     if (key === "speed") {
       progression.speed = bounded(progression.speed + delta * 5, 0, 200, 35);
     } else {
@@ -3018,6 +3023,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       if (key === "con") adjustMaximum(constitutionDelta(old, scoreMod(key)));
     }
     saveProgress(key === "speed" ? "скорость" : "характеристики");
+    var after = key === "speed" ? progression.speed : scoreValue(key);
+    if (after !== before) actionEffect({ key: "control-update", kind: "progression", amount: after - before, button: button });
   });
   function changeProficiency(sk, next) {
     sk.dataset.prof = bounded(next, 0, sk.dataset.kind === "save" ? 1 : 2, 0);
@@ -3029,6 +3036,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       var i = parseInt(id.slice(4), 10) || 0;
       setExh(event.target.checked ? i + 1 : i);
       recompute(); saveFields(); noteChange("истощение");
+      actionEffect({ key: event.target.checked ? "condition-exhaustion" : "health-heal",
+        kind: "condition", symbol: event.target.checked ? "!" : "✓", button: event.target });
     }
   });
   function cycleProficiency(event) {
@@ -3041,6 +3050,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     var old = Number(sk.dataset.prof) || 0;
     var next = (old + 1) % (sk.dataset.kind === "save" ? 2 : 3);
     changeProficiency(sk, next);
+    actionEffect({ key: "control-update", kind: "proficiency", symbol: "✓", button: pm });
   }
   document.addEventListener("click", cycleProficiency);
   document.addEventListener("keydown", cycleProficiency);
@@ -3071,10 +3081,13 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       var before = read("xp", 0);
       var after = Math.max(0, before + Number(button.dataset.xpDelta));
       if (after === before) return;
+      if (after < before && !confirm("Вы уверены, что хотите уменьшить опыт на " + (before - after) + "?")) return;
       write("xp", after);
       touch(cell("xp"));
       saveNow();
       noteChange("опыт");
+      actionEffect({ key: after > before ? "experience-gain" : "experience-loss",
+        kind: "experience", amount: after - before, button: button });
     });
   });
 
@@ -3197,7 +3210,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       showHpToast(text, hurt);
     }
 
-    function apply(sign) {
+    function apply(sign, anchor) {
       var n = Math.floor(Math.abs(num(input.value)));
       if (!n) { say("Впиши число"); input.focus(); return; }
 
@@ -3218,14 +3231,14 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
         say("−" + n + ": " + (parts.join(", ") || "ничего") + ". Осталось " + left
             + (left === 0 ? " — спасброски от смерти" : ""), true);
         if (fromTemp + fromHp > 0) actionEffect({ key: "health-damage", kind: "damage",
-          amount: -(fromTemp + fromHp), button: cell(fromHp ? "hp-now" : "hp-temp"), fallback: input });
+          amount: -(fromTemp + fromHp), button: anchor || input, fallback: cell(fromHp ? "hp-now" : "hp-temp") });
       } else {
         var healed = Math.min(max, hp + n);
         write("hp-now", healed);
         say("+" + (healed - hp) + ": стало " + healed + " из " + max
             + (healed === max ? " — максимум" : ""));
         if (healed > hp) actionEffect({ key: "health-heal", kind: "heal",
-          amount: healed - hp, button: cell("hp-now"), fallback: input });
+          amount: healed - hp, button: anchor || input, fallback: cell("hp-now") });
       }
 
       input.value = "";
@@ -3269,8 +3282,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       say("Максимум вписан вручную — Подмога снята с учёта");
     }, true);
 
-    document.getElementById("dmg-hit").addEventListener("click", function () { apply(-1); });
-    document.getElementById("dmg-heal").addEventListener("click", function () { apply(1); });
+    document.getElementById("dmg-hit").addEventListener("click", function () { apply(-1, this); });
+    document.getElementById("dmg-heal").addEventListener("click", function () { apply(1, this); });
     input.addEventListener("keydown", function (e) {
       // Enter applies damage; Shift+Enter heals.
       if (e.key !== "Enter") return;
@@ -3925,6 +3938,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   // Replaced below once the box is found; the rest buttons call it. Returns whether a
   // concentration was actually dropped. The caller saves.
   var dropConcentration = function () { return false; };
+  var castingConcentration = false;
   // Replaced by the free-use block below; the rest buttons call it after clearing the
   // pips of «Разовое», which they do without events, so the mirrors would not notice.
   var syncFree = function () {};
@@ -4015,12 +4029,14 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     // Only what moved is marked for saving. A bare saveFields() means «this tab touched
     // everything», and a second open tab would then roll the whole sheet back - far too
     // heavy for something that is toggled several times a fight.
-    function changed() {
+    function changed(anchor) {
       fill();
       mirror();
       [on, store].concat(rowTicks()).forEach(touch);
       saveFields({ target: on });
       noteChange("концентрация");
+      if (!castingConcentration) actionEffect({ key: "concentration", kind: "concentration",
+        symbol: on.checked ? "✓" : "×", button: anchor });
     }
 
     // For the rest buttons: no rest finds a concentration still held. Through mirror(),
@@ -4048,26 +4064,27 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
 
     pick.addEventListener("change", function () {
       store.textContent = pick.value;
-      changed();
+      changed(pick);
     });
     on.addEventListener("change", function () {
       // What the list shows at the moment he ticks is what he is holding - and letting
       // go means «нет», not «the last one, greyed out»: an ended concentration must read
       // as ended, in both places at once.
       store.textContent = on.checked ? pick.value : "";
-      changed();
+      changed(on);
     });
     table.addEventListener("change", function (e) {
       var m = e.target.dataset && /^s(\d+)k$/.exec(e.target.dataset.id || "");
       if (!m) return;
       store.textContent = e.target.checked ? rowName(m[1]) : "";
       on.checked = e.target.checked;
-      changed();
+      changed(e.target);
     });
   })();
 
   // Keep a visible origin through nested clicks from a mirrored free-use checkbox.
   var resourceUseOrigin = null;
+  var slotUseOrigin = null;
 
   function finishSpellUse(row, anchor, resource, level, remaining) {
     var name = row.querySelector('td[data-cell$="n"]').textContent.trim();
@@ -4079,7 +4096,10 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     var replaced = !!(concentration && previous && previous !== name);
     if (concentration) {
       var tick = row.querySelector('input[data-id$="k"]');
-      if (tick && !tick.checked) tick.click();
+      if (tick && !tick.checked) {
+        castingConcentration = true;
+        try { tick.click(); } finally { castingConcentration = false; }
+      }
     }
     var label = resource === "slot" ? "ячейка " + level : "бесплатное применение";
     noteChange("заклинание: " + name + " · " + label);
@@ -4091,7 +4111,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     showHpToast(message, replaced);
     actionEffect({ key: row.querySelector("td.ed[data-id]").dataset.id, name: name,
       level: level || 0, kind: "spell", resource: resource, warning: replaced,
-      previous: replaced ? previous : "", button: anchor });
+      concentration: !!concentration, previous: replaced ? previous : "", button: anchor });
   }
 
   // ============================================== free uses in the spell table
@@ -4163,7 +4183,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
           "Ячейки " + level + "-го уровня пока недоступны", true);
         return;
       }
-      free[0].click();
+      slotUseOrigin = button;
+      try { free[0].click(); } finally { slotUseOrigin = null; }
       finishSpellUse(button.closest("tr"), button, "slot", level, free.length - 1);
     });
   })();
@@ -4199,16 +4220,18 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     var pip = event.target;
     var id = pip.dataset && pip.dataset.id;
     if (!id || id.indexOf("res") !== 0 || pip.type !== "checkbox" || pip.hidden || pip.disabled) return;
-    if (!pip.checked) {
-      noteChange("возвращено разовое применение");
-      saveNow();
-      return;
-    }
     var origin = resourceUseOrigin || pip;
     var mirror = resourceUseOrigin || list("#spelltable input[data-free]").find(function (input) {
       return id.indexOf(input.dataset.free + "-") === 0;
     });
     var row = mirror && mirror.closest("tr");
+    if (!pip.checked) {
+      noteChange("возвращено разовое применение");
+      saveNow();
+      actionEffect({ key: row ? row.querySelector("td.ed[data-id]").dataset.id : "resource-inspiration",
+        kind: "resource", resource: "refund", amount: 1, button: origin });
+      return;
+    }
     if (row) { finishSpellUse(row, origin, "free"); return; }
     var label = pip.closest(".it");
     label = label && label.querySelector(".t");
@@ -4219,6 +4242,29 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     saveNow();
     showHpToast(name + " · применение потрачено");
     actionEffect({ key: "resource-inspiration", kind: "resource", name: name, button: origin });
+  });
+
+  // A direct slot adjustment is resource bookkeeping, not another spell cast.
+  document.addEventListener("change", function (event) {
+    var pip = event.target, id = pip.dataset && pip.dataset.id;
+    var slot = id && /^sl([1-9])-\d+$/.exec(id);
+    if (!slot || slotUseOrigin || pip.hidden || pip.disabled) return;
+    actionEffect({ key: "slot-" + slot[1], kind: "slot", level: Number(slot[1]),
+      amount: pip.checked ? -1 : 1, button: pip });
+  });
+
+  // Remaining gameplay marks use the same transient layer, never a second save.
+  document.addEventListener("change", function (event) {
+    var pip = event.target, id = pip.dataset && pip.dataset.id;
+    if (!id || pip.type !== "checkbox" || pip.hidden || pip.disabled ||
+        !pip.closest('.sheet[data-page="list"],.sheet[data-page="spells"]') ||
+        /^(res|sl[1-9]-|exh-|conc-on$|s\d+k$)/.test(id)) return;
+    var key = /^hd-/.test(id) ? "resource-hit-die" : /^ds-/.test(id) ? "health-heal" :
+      /^df-/.test(id) ? "health-damage" : /^insp/.test(id) ? "resource-inspiration" :
+      /^bless/.test(id) ? "sp-благословение" : "control-update";
+    actionEffect({ key: key, kind: "resource", button: pip,
+      amount: /^hd-/.test(id) ? (pip.checked ? -1 : 1) : undefined,
+      symbol: pip.checked ? "✓" : "↶" });
   });
 
   // ============================================================ кубы
@@ -5596,7 +5642,23 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       'sp-возвращение к жизни': ['#bf9964', 'flame'],
       'resource-inspiration': ['#b89342', 'voice'],
       'health-damage': ['#d4555d', 'damage'],
-      'health-heal': ['#35a26b', 'heal']
+      'health-heal': ['#35a26b', 'heal'],
+      'experience-gain': ['#c7a144', 'star'],
+      'experience-loss': ['#d4555d', 'damage'],
+      'concentration': ['#c4a56a', 'hourglass'],
+      'control-update': ['#6b9fd4', 'star'],
+      'progression-level': ['#c7a144', 'book'],
+      'resource-hit-die': ['#8e81be', 'mirrors'],
+      'condition-exhaustion': ['#bc8754', 'hourglass'],
+      'slot-1': ['#4d9bcc', 'star'],
+      'slot-2': ['#697ed4', 'mirrors'],
+      'slot-3': ['#8b6bce', 'spiral'],
+      'slot-4': ['#b26cbd', 'portal'],
+      'slot-5': ['#c96e98', 'flame'],
+      'slot-6': ['#d18a59', 'thunder'],
+      'slot-7': ['#bd9b3f', 'shield'],
+      'slot-8': ['#569c71', 'sprout'],
+      'slot-9': ['#3eaaa3', 'feather']
     };
     var glyphs = {
       feather: '<path d="M5 19 17 5M8 16 5 11l5 1-1-5 5 1 4-4c4 4 1 11-5 12Z"/>',
@@ -5616,7 +5678,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       portal: '<ellipse cx="12" cy="12" rx="7" ry="10"/><ellipse cx="12" cy="12" rx="3" ry="6"/>',
       flame: '<path d="M13 2q1 8 6 10 3 8-7 10Q1 20 5 12l3-4q-1 7 4 7 5-2 1-13Z"/>',
       damage: '<path d="m5 3 5 6-3 5 7 7M19 3l-6 7 5 3-3 6"/>',
-      broken: '<path d="M9 3a9 9 0 0 0-6 12M15 21a9 9 0 0 0 6-12M14 2l-4 8h5l-5 12"/>'
+      broken: '<path d="M9 3a9 9 0 0 0-6 12M15 21a9 9 0 0 0 6-12M14 2l-4 8h5l-5 12"/>',
+      hourglass: '<path d="M6 2h12M6 22h12M7 3v4l5 5-5 5v4M17 3v4l-5 5 5 5v4M9 6l3 3 3-3M9 19l3-3 3 3"/>'
     };
 
     // The same profile paints both the permanent cast control and its animation.
@@ -5669,7 +5732,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       picker.value = mode;
       picker.title = reducedMotion.matches ?
         'Системная настройка уменьшения движения отключает анимацию' :
-        'Эффекты заклинаний, разовых применений, хитов и Подмоги на этом устройстве';
+        'Эффекты игровых кнопок: ячейки, концентрация, хиты, опыт и ресурсы на этом устройстве';
     }
     picker.addEventListener('change', function () {
       mode = picker.value;
@@ -5714,6 +5777,8 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       burst.dataset.style = profile[1];
       burst.dataset.spellKey = key;
       burst.dataset.kind = detail.kind || 'spell';
+      var level = Math.max(0, Math.min(9, Math.trunc(Number(detail.level) || 0)));
+      burst.dataset.level = String(level);
       burst.dataset.warning = String(!!detail.warning);
       burst.sourceButton = anchor;
       burst.anchorLeft = rect.left;
@@ -5722,19 +5787,21 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       burst.style.top = (rect.top + rect.height / 2) + 'px';
       burst.style.setProperty('--fx-color', profile[0]);
       var angle = Array.from(key).reduce(function (sum, letter) { return (sum + letter.charCodeAt(0)) % 360; }, 0);
-      var rays = Array.from({ length: 8 }, function (_, i) {
-        return '<g transform="rotate(' + (angle + i * 45) + ')"><circle class="spell-effect-mote" cx="0" cy="0" r="1.7" style="--ray-delay:' + (i % 3 * 30) + 'ms"/></g>';
+      var rayCount = level ? 6 + level : 8;
+      var rays = Array.from({ length: rayCount }, function (_, i) {
+        return '<g transform="rotate(' + (angle + i * 360 / rayCount) + ')"><circle class="spell-effect-mote" cx="0" cy="0" r="1.7" style="--ray-delay:' + (i % 3 * 30) + 'ms"/></g>';
       }).join('');
+      var concentrationBadge = detail.concentration ? '<g class="spell-effect-concentration"><svg x="-36" y="-26" width="18" height="18" viewBox="0 0 24 24">' + glyphs.hourglass + '</svg></g>' : '';
       // Only trusted constant SVG fragments enter markup; names/notes never do.
       burst.innerHTML = '<svg class="spell-effect-art" viewBox="-60 -60 120 120" aria-hidden="true">' +
         '<circle class="spell-effect-wave" r="12"/><circle class="spell-effect-wave spell-effect-wave-secondary" r="12"/>' +
         '<circle class="spell-effect-core" r="3"/><g class="spell-effect-lift"><svg x="-12" y="-12" width="24" height="24" viewBox="0 0 24 24">' +
         glyphs[profile[1]] + '</svg></g><g class="spell-effect-sparks">' + rays +
-        '</g><text class="spell-effect-cost" x="0" y="8" text-anchor="middle">−1</text></svg>';
+        '</g>' + concentrationBadge + '<text class="spell-effect-cost" x="0" y="8" text-anchor="middle">−1</text></svg>';
       var amount = detail.amount;
       burst.querySelector('.spell-effect-cost').textContent = detail.warning ? '!' :
         typeof amount === 'number' && Number.isFinite(amount) ?
-          (amount < 0 ? '−' : '+') + Math.abs(amount) : '−1';
+          (amount < 0 ? '−' : '+') + Math.abs(amount) : typeof detail.symbol === 'string' ? detail.symbol : '−1';
       while (active.length >= 3) removeBurst(active[0]);
       layer.appendChild(burst);
       active.push(burst);
