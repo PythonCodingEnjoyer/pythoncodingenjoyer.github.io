@@ -1028,6 +1028,10 @@ html[data-preview-layout="v2"] .preview-spell-legend{font-size:var(--v2-caption)
 .pixel-card canvas{display:block;width:64px;height:64px;image-rendering:pixelated;pointer-events:none}
 html[data-theme="dark"] .pixel-card canvas{filter:invert(1)}
 .pixel-card:not(.pixel-card-leaving):focus-visible{opacity:1}
+html[data-tune="1"] .pixel-card{cursor:grab;touch-action:none;user-select:none;-webkit-user-select:none}
+.pixel-card.pixel-card-dragging{opacity:.15!important;cursor:grabbing}
+.pixel-card.pixel-card-drop-target{outline:2px dashed var(--hand);outline-offset:3px}
+.pixel-drag-ghost{position:fixed;z-index:210;pointer-events:none;opacity:1;transition:none;cursor:grabbing}
 .pixel-menu{position:fixed;z-index:200;padding:4px;background:var(--paper);color:var(--ink);border:1px solid var(--hair);border-radius:4px;box-shadow:0 4px 16px #0002;min-width:160px}
 .pixel-menu[hidden]{display:none}
 .pixel-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;text-align:left;background:none;border:0;font:inherit;font-size:14px;color:var(--ink);cursor:pointer}
@@ -3322,8 +3326,9 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
         Number.isSafeInteger(a.created) && Number.isFinite(new Date(a.created).getTime()) && Pixel16.valid(a.pixels) &&
         (a.caption === undefined || typeof a.caption === "string");
     }
-    if (["add", "edit", "delete", "caption"].indexOf(d.action) < 0 ||
+    if (["add", "edit", "delete", "caption", "reorder"].indexOf(d.action) < 0 ||
         ((d.action === "add" || d.action === "edit") && !validArt(d.record)) ||
+        (d.action === "reorder" && (!Array.isArray(d.order) || !Array.isArray(d.expectedOrder))) ||
         (d.action === "caption" && (typeof d.caption !== "string" || typeof d.expectedCaption !== "string"))) {
       d.error = "Не удалось прочитать рисунок или подпись."; return;
     }
@@ -3336,7 +3341,17 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       d.error = "Данные рисунков повреждены. Они не перезаписаны — восстанови копию."; return;
     }
     var at = items.findIndex(function (a) { return a.id === d.id; });
-    if (d.action === "add") {
+    if (d.action === "reorder") {
+      var ids = items.map(function (a) { return a.id; });
+      if (JSON.stringify(ids) !== JSON.stringify(d.expectedOrder) || d.order.length !== ids.length ||
+          new Set(d.order).size !== ids.length || !Array.from(d.order).every(function (id) { return ids.indexOf(id) >= 0; })) {
+        marker.textContent = raw;
+        d.error = "Порядок рисунков изменился. Повтори перенос."; return;
+      }
+      if (JSON.stringify(ids) === JSON.stringify(d.order)) { d.ok = true; return; }
+      var byId = new Map(items.map(function (a) { return [a.id, a]; }));
+      items = d.order.map(function (id) { return byId.get(id); });
+    } else if (d.action === "add") {
       if (!validArt(d.record) || items.some(function (a) { return a.id === d.record.id; })) {
         d.error = "Не удалось добавить рисунок: проверь данные."; return;
       }
@@ -3384,9 +3399,10 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       return;
     }
     noteChange(d.action === "add" ? "получено героическое вдохновение · зарисовка" :
-      d.action === "delete" ? "удалена зарисовка" : d.action === "caption" ? "изменена подпись к вдохновению" : "изменена зарисовка");
+      d.action === "delete" ? "удалена зарисовка" : d.action === "caption" ? "изменена подпись к вдохновению" :
+      d.action === "reorder" ? "переставлены зарисовки" : "изменена зарисовка");
     d.ok = true;
-    if (d.action !== "delete") d.savedRecord = JSON.parse(JSON.stringify(d.action === "add" ? items[items.length-1] : items[at]));
+    if (d.action !== "delete" && d.action !== "reorder") d.savedRecord = JSON.parse(JSON.stringify(d.action === "add" ? items[items.length-1] : items[at]));
     actionEffect({ key: d.action === "delete" ? "service-delete" : d.action === "add" ? "heroic-inspiration" : "service-save",
       kind: d.action === "add" ? "resource" : "service", symbol: d.action === "delete" ? "×" : "✓",
       button: d.anchor instanceof Element ? d.anchor : document.getElementById("heroic-draw") });
@@ -5532,10 +5548,12 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     }
 
     function adopt(got) {
-      // A peer refresh must not destroy an unfinished picture or hidden-answer draft.
-      if (document.querySelector("#pixel-dialog[open]")) {
+      // A peer refresh must not destroy an unfinished picture, answer or margin drag.
+      var draggingArt = document.querySelector('.heroic-rails[data-dragging="true"]');
+      if (document.querySelector("#pixel-dialog[open]") || draggingArt) {
         peerDeferred = true;
-        say("на сервере есть правки — закрой рисунок, чтобы применить их");
+        say(draggingArt ? "на сервере есть правки — заверши перенос рисунка" :
+          "на сервере есть правки — закрой рисунок, чтобы применить их");
         return;
       }
       peerDeferred = false;
@@ -5758,6 +5776,9 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     document.addEventListener("close", function (event) {
       if (event.target.id === "pixel-dialog" && peerDeferred) syncSoon();
     }, true);
+    document.addEventListener("alvarej:heroic-reorder-end", function () {
+      if (peerDeferred) syncSoon();
+    });
 
     if (devBox) {
       devBox.value = devName();
@@ -7017,6 +7038,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   rails.innerHTML = '<aside class="heroic-rail left" aria-label="Зарисовки слева"></aside><aside class="heroic-rail right" aria-label="Зарисовки справа"></aside>';
   sheet.appendChild(rails);
   var sides = Array.from(rails.children), cards = new Map();
+  var reorderDrag = null, suppressedClick = null;
   var originalMinHeight = sheet.style.minHeight, baseMinHeight = parseFloat(getComputedStyle(sheet).minHeight) || 0;
   var menu = document.createElement('div');
   menu.className = 'pixel-menu'; menu.hidden = true; menu.setAttribute('role', 'menu');
@@ -7090,6 +7112,7 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
     if (sheet.style.minHeight !== minimum) sheet.style.minHeight = minimum;
   }
   function render() {
+    if (reorderDrag && reorderDrag.started) return;
     var items = records();
     button.disabled = !items;
     status.hidden = !!items;
@@ -7106,7 +7129,10 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
       if (!card) {
         card = document.createElement('button'); card.type = 'button'; card.className = 'pixel-card'; card.dataset.artId = record.id;
         var image = document.createElement('canvas'); image.width = image.height = 16; image.setAttribute('aria-hidden','true'); card.appendChild(image);
-        card.addEventListener('click', function () {
+        card.addEventListener('click', function (event) {
+          if (suppressedClick && suppressedClick.card === card && event.detail !== 0) {
+            suppressedClick = null; event.preventDefault(); event.stopPropagation(); return;
+          }
           var r = (records() || []).find(function (a) { return a.id === card.dataset.artId; });
           if (r) open(r);
         });
@@ -7122,12 +7148,77 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
         cards.set(record.id, card);
       }
       paint(card.querySelector('canvas'), record.pixels, false, true);
-      card.title = clock.format(record.created) + ' МСК' + (tuned() ? ' · ПКМ: изменить или удалить' : ' · открыть рисунок');
+      card.title = clock.format(record.created) + ' МСК' + (tuned() ? ' · перетащи на другое место · ПКМ: изменить или удалить' : ' · открыть рисунок');
       card.setAttribute('aria-label', 'Зарисовка ' + (i + 1) + ', ' + clock.format(record.created));
       sides[i % 2].appendChild(card);
     });
     sizeRails();
   }
+  function clearDropTarget() {
+    cards.forEach(function(card){card.classList.remove('pixel-card-drop-target');});
+  }
+  function dropIndexAt(drag,x,y) {
+    var index=null;
+    drag.slots.some(function(r,i){
+      if(x>=r.left-5&&x<=r.right+5&&y>=r.top-5&&y<=r.bottom+5){index=i;return true;}return false;
+    });
+    return index;
+  }
+  function finishReorder(event, commit) {
+    var drag = reorderDrag;
+    if (!drag || event && event.pointerId !== undefined && event.pointerId !== drag.pointer) return;
+    if (commit && drag.started && event && event.type==='pointerup')drag.target=dropIndexAt(drag,event.clientX,event.clientY);
+    reorderDrag = null; rails.removeAttribute('data-dragging'); clearDropTarget();
+    drag.card.classList.remove('pixel-card-dragging');
+    if (drag.ghost) drag.ghost.remove();
+    if (drag.started) {
+      var blocked = {card:drag.card,pointer:drag.pointer};suppressedClick=blocked;
+      if (event && (event.type==='pointerup'||event.type==='pointercancel')) {
+        setTimeout(function(){if(suppressedClick===blocked)suppressedClick=null;},0);
+      }
+    }
+    try { if(drag.card.hasPointerCapture(drag.pointer))drag.card.releasePointerCapture(drag.pointer); } catch(e) {}
+    if (!drag.started) return;
+    if (commit && tuned() && drag.target!==null && drag.target!==drag.from) {
+      var order=drag.ids.slice(),id=order.splice(drag.from,1)[0];order.splice(drag.target,0,id);
+      var result={action:'reorder',order:order,expectedOrder:drag.ids,anchor:drag.card};
+      document.dispatchEvent(new CustomEvent('alvarej:heroic-art-commit',{detail:result}));
+      if(!result.ok)alert(result.error||'Не удалось сохранить порядок рисунков.');
+    }
+    render();
+    document.dispatchEvent(new CustomEvent('alvarej:heroic-reorder-end'));
+  }
+  rails.addEventListener('pointerdown',function(event){
+    var card=event.target.closest('.pixel-card');
+    if(!card||!rails.contains(card)||!tuned()||dialog.open||event.button!==0||reorderDrag||rails.dataset.visible!=='true')return;
+    var items=records();if(!items)return;var ids=items.map(function(a){return a.id;}),from=ids.indexOf(card.dataset.artId);
+    if(from<0)return;
+    var rect=card.getBoundingClientRect();
+    reorderDrag={pointer:event.pointerId,card:card,record:items[from],ids:ids,from:from,target:null,started:false,x:event.clientX,y:event.clientY,offsetX:event.clientX-rect.left,offsetY:event.clientY-rect.top};
+    card.setPointerCapture(event.pointerId);
+  });
+  rails.addEventListener('pointermove',function(event){
+    var drag=reorderDrag;if(!drag||event.pointerId!==drag.pointer)return;
+    if(!tuned()){finishReorder(event,false);return;}
+    if(!drag.started){
+      if(Math.hypot(event.clientX-drag.x,event.clientY-drag.y)<6)return;
+      drag.started=true;hideMenu();rails.dataset.dragging='true';
+      drag.slots=drag.ids.map(function(id){return cards.get(id).getBoundingClientRect();});
+      drag.card.classList.add('pixel-card-dragging');
+      drag.ghost=drag.card.cloneNode(true);drag.ghost.className='pixel-card pixel-drag-ghost';drag.ghost.removeAttribute('data-art-id');drag.ghost.setAttribute('aria-hidden','true');drag.ghost.tabIndex=-1;
+      paint(drag.ghost.querySelector('canvas'),drag.record.pixels,false,true);document.body.appendChild(drag.ghost);
+    }
+    event.preventDefault();
+    drag.ghost.style.left=Math.max(0,Math.min(innerWidth-72,event.clientX-drag.offsetX))+'px';
+    drag.ghost.style.top=Math.max(0,Math.min(innerHeight-72,event.clientY-drag.offsetY))+'px';
+    clearDropTarget();drag.target=dropIndexAt(drag,event.clientX,event.clientY);
+    if(drag.target!==null)cards.get(drag.ids[drag.target]).classList.add('pixel-card-drop-target');
+  });
+  rails.addEventListener('pointerup',function(e){finishReorder(e,true);});
+  rails.addEventListener('pointercancel',function(e){finishReorder(e,false);});
+  rails.addEventListener('lostpointercapture',function(e){finishReorder(e,false);});
+  document.addEventListener('pointerdown',function(e){if(suppressedClick&&suppressedClick.pointer===e.pointerId)suppressedClick=null;},true);
+  document.addEventListener('pointerup',function(e){var blocked=suppressedClick;if(blocked&&blocked.pointer===e.pointerId)setTimeout(function(){if(suppressedClick===blocked)suppressedClick=null;},0);},true);
   function hideMenu() { menu.hidden = true; }
   function showMenu(card, x, y) {
     if (!tuned()) return;
@@ -7266,11 +7357,13 @@ var SYNC = {"db": "https://alvarey-default-rtdb.europe-west1.firebasedatabase.ap
   });
   button.addEventListener('click',function(){open(null);});
   document.addEventListener('pointerdown',function(e){if(!menu.contains(e.target))hideMenu();});
-  document.addEventListener('keydown',function(e){if(e.key==='Escape')hideMenu();});
+  document.addEventListener('keydown',function(e){if(e.key==='Escape'){if(reorderDrag)finishReorder(null,false);hideMenu();}});
   new MutationObserver(render).observe(marker,{childList:true,subtree:true,characterData:true});
-  new MutationObserver(function(){hideMenu();render();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-tune']});
-  new ResizeObserver(sizeRails).observe(sheet);window.addEventListener('resize',sizeRails);
-  if(window.visualViewport)visualViewport.addEventListener('resize',sizeRails);
+  new MutationObserver(function(){if(reorderDrag)finishReorder(null,false);hideMenu();render();}).observe(document.documentElement,{attributes:true,attributeFilter:['data-tune']});
+  function viewportChanged(){if(reorderDrag&&reorderDrag.started)finishReorder(null,false);}
+  window.addEventListener('scroll',viewportChanged,{passive:true});
+  new ResizeObserver(sizeRails).observe(sheet);window.addEventListener('resize',function(){viewportChanged();sizeRails();});
+  if(window.visualViewport)visualViewport.addEventListener('resize',function(){viewportChanged();sizeRails();});
   render();
 })();
 </script></body>
