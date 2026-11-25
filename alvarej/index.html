@@ -356,7 +356,8 @@ html[data-theme="dark"] .coin-platinum{--coin-ink:#9DC8D3}
 /* Ступень взята — это должно быть видно и там, где число поехало: скорость
    красится тем же цветом, что и перебор веса, а подпись перестаёт быть серой. */
 html[data-exh]:not([data-exh="0"]) .exh-note{color:var(--warn);font-weight:700}
-html[data-exh]:not([data-exh="0"]) [data-calc="speed"]{color:var(--warn)}
+html[data-exh]:not([data-exh="0"]) [data-calc="speed"],
+html[data-exh]:not([data-exh="0"]) [data-calc="passive"]{color:var(--warn)}
 
 /* ---------- текстовые блоки ---------- */
 .prose{flex:0 0 auto;font-size:calc(var(--k)*1.62cqw);line-height:1.4;outline:none}
